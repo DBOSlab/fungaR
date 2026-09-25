@@ -167,7 +167,7 @@
   wanted <- c("key", "scientificName", "stateProvince", "municipality", "locality",
              "recordedBy", "recordNumber", "eventDate", "institutionCode",
              "collectionCode", "catalogNumber", "decimalLatitude", "decimalLongitude")
-  empty <- as.data.frame(setNames(rep(list(character(0)), length(wanted)), wanted),
+  empty <- as.data.frame(stats::setNames(rep(list(character(0)), length(wanted)), wanted),
                          stringsAsFactors = FALSE)
 
   url <- paste0("https://api.gbif.org/v1/occurrence/search?scientificName=",

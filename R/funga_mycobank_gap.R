@@ -296,7 +296,7 @@ funga_mycobank_gap <- function(taxon,
   rownames(result) <- NULL
 
   if (verbose) {
-    message(sprintf("\n✓ %d candidate species found in MycoBank but missing from FFB",
+    message(sprintf("\n\u2713 %d candidate species found in MycoBank but missing from FFB",
                     nrow(result)))
   }
 
