@@ -173,3 +173,36 @@ test_that("funga_get_children_taxa warns and returns an empty data.frame when no
 test_that("funga_get_children_taxa requires a non-null taxon_name", {
   expect_error(funga_get_children_taxa(taxon_name = NULL), "must be provided")
 })
+
+
+test_that("funga_get_children_taxa returns varieties for a species parent", {
+  fixture <- .funga_children_fixture()
+  fixture <- rbind(fixture, data.frame(
+    id = "9",
+    taxonName = "Trichoderma harzianum var. minor",
+    taxonRank = "VARIEDADE",
+    phylum = "Ascomycota",
+    family = "Hypocreaceae",
+    genus = "Trichoderma",
+    order = "Hypocreales",
+    taxonomicStatus = "NOME_ACEITO",
+    parentNameUsageID = "5",
+    stringsAsFactors = FALSE
+  ))
+  .mock_funga_children(fixture)
+
+  result <- funga_get_children_taxa(taxon_name = "Trichoderma harzianum", rank = "species",
+                                    child_rank = "variety", verbose = FALSE)
+  expect_equal(result$taxonName, "Trichoderma harzianum var. minor")
+})
+
+
+test_that("funga_get_children_taxa prints progress messages when verbose = TRUE", {
+  .mock_funga_children(.funga_children_fixture())
+
+  expect_message(
+    funga_get_children_taxa(taxon_name = "Trichoderma", rank = "genus",
+                            child_rank = "species", verbose = TRUE),
+    "Found parent"
+  )
+})

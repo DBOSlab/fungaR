@@ -25,6 +25,14 @@
       list(n_records = sum(gbif_states$count), states = paste(gbif_states$state, collapse = "; "),
           state_counts = gbif_states)
     },
+    .gbif_brazil_state_records = function(name, state, limit = 50) {
+      data.frame(key = integer(0), scientificName = character(0), stateProvince = character(0),
+                municipality = character(0), locality = character(0), recordedBy = character(0),
+                recordNumber = character(0), eventDate = character(0), institutionCode = character(0),
+                collectionCode = character(0), catalogNumber = character(0),
+                decimalLatitude = numeric(0), decimalLongitude = numeric(0),
+                GBIF_URL = character(0), stringsAsFactors = FALSE)
+    },
     .splink_brazil_occurrence = function(name) {
       if (is.null(splink_states)) {
         return(list(n_records = NA_integer_, states = NA_character_))
@@ -127,4 +135,98 @@ test_that("funga_distribution_gap returns an empty data.frame when no source has
 test_that("funga_distribution_gap requires a single character taxon", {
   expect_error(funga_distribution_gap(taxon = NULL), "single character string")
   expect_error(funga_distribution_gap(taxon = c("A", "B")), "single character string")
+})
+
+
+test_that("funga_distribution_gap writes a real .xlsx file when save = TRUE", {
+  .mock_funga_distribution_records("Trichoderma harzianum", ffb_states = "BA")
+  .mock_occurrence_sources(gbif_states = data.frame(state = c("Bahia", "Pernambuco"), count = c(5L, 2L)))
+  out_dir <- withr::local_tempdir()
+
+  result <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+                                   sources = "gbif", save = TRUE, html_report = FALSE,
+                                   dir = out_dir, filename = "dist_gap", verbose = FALSE)
+
+  expect_true(file.exists(file.path(out_dir, "dist_gap.xlsx")))
+  expect_gt(nrow(result), 0)
+})
+
+
+test_that("funga_distribution_gap includes REFLORA evidence when refloraR is installed", {
+  skip_if_not_installed("refloraR")
+
+  .mock_funga_distribution_records("Trichoderma harzianum", ffb_states = "BA")
+  .mock_occurrence_sources()
+
+  fake_reflora <- data.frame(
+    stateProvince = c("Pernambuco", "Pernambuco", "Bahia"),
+    municipality = c("Recife", "Caruaru", "Salvador"),
+    locality = c("Loc 1", "Loc 2", "Loc 3"),
+    recordedBy = c("Silva", "Souza", "Costa"),
+    recordNumber = c("1", "2", "3"),
+    herbarium = c("RB", "RB", "RB"),
+    bibliographicCitation = c("https://reflora/1", "https://reflora/2", "https://reflora/3"),
+    stringsAsFactors = FALSE
+  )
+  testthat::local_mocked_bindings(
+    reflora_records = function(taxon, verbose, save) fake_reflora,
+    .package = "refloraR"
+  )
+
+  result <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+                                   sources = "reflora", save = FALSE, html_report = FALSE,
+                                   verbose = FALSE)
+
+  expect_true("REFLORA_records" %in% names(result))
+  pe_row <- result[result$State == "Pernambuco", ]
+  expect_equal(pe_row$REFLORA_records, 2L)
+  expect_true(pe_row$New_state_record_candidate)
+})
+
+
+test_that("funga_distribution_gap skips REFLORA gracefully when refloraR is not installed", {
+  testthat::local_mocked_bindings(
+    requireNamespace = function(pkg, ...) if (identical(pkg, "refloraR")) FALSE else TRUE,
+    .package = "base"
+  )
+
+  .mock_funga_distribution_records("Trichoderma harzianum", ffb_states = "BA")
+  .mock_occurrence_sources(gbif_states = data.frame(state = "Bahia", count = 1L))
+
+  result <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+                                   sources = c("gbif", "reflora"), save = FALSE,
+                                   html_report = FALSE, verbose = FALSE)
+
+  expect_false("REFLORA_records" %in% names(result) && any(!is.na(result$REFLORA_records)))
+})
+
+
+test_that("funga_distribution_gap populates records_detail for new-state GBIF candidates in the HTML report", {
+  skip_if_not_installed("rmarkdown")
+  skip_if_not_installed("DT")
+  skip_if_not_installed("htmltools")
+  skip_if_not(rmarkdown::pandoc_available(), "pandoc not available")
+
+  .mock_funga_distribution_records("Trichoderma harzianum", ffb_states = "BA")
+  .mock_occurrence_sources(gbif_states = data.frame(state = c("Bahia", "Pernambuco"), count = c(5L, 2L)))
+  testthat::local_mocked_bindings(
+    .gbif_brazil_state_records = function(name, state, limit = 50) {
+      data.frame(key = 999, scientificName = name, stateProvince = state,
+                municipality = "Recife", locality = "Loc", recordedBy = "Someone",
+                recordNumber = "1", eventDate = "2020-01-01", institutionCode = "UFPE",
+                collectionCode = NA, catalogNumber = "abc",
+                decimalLatitude = -8, decimalLongitude = -36,
+                GBIF_URL = "https://www.gbif.org/occurrence/999", stringsAsFactors = FALSE)
+    },
+    .package = "fungaR"
+  )
+
+  out_dir <- withr::local_tempdir()
+  funga_distribution_gap(taxon = "Trichoderma harzianum", sources = "gbif", save = FALSE,
+                        html_report = TRUE, open_report = FALSE, dir = out_dir,
+                        filename = "records_detail_test", verbose = FALSE)
+
+  expect_true(file.exists(file.path(out_dir, "records_detail_test.html")))
+  html_txt <- paste(readLines(file.path(out_dir, "records_detail_test.html"), warn = FALSE), collapse = "\n")
+  expect_true(grepl("gbif.org/occurrence/999", html_txt, fixed = TRUE))
 })

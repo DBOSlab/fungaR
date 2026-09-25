@@ -28,9 +28,13 @@
   <line x1="230" y1="140" x2="266" y2="140" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
   <line x1="460" y1="140" x2="496" y2="140" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <!-- connector: stage 1 -> stage 2 (jog well above the stage-2 header) -->
-  <path d="M595,166 L595,180 L155,180 L155,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M595,166 L595,180 L435,180 L435,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- connector: stage 1 -> stage 2. The horizontal jog sits BELOW the
+       stage-2 header baseline (214) rather than above it, so the short
+       vertical segments dropping into the boxes at x=155/x=435 - which sit
+       directly under the header's left-aligned text - never cross the
+       header's glyph band, regardless of which box they target. -->
+  <path d="M595,166 L595,222 L155,222 L155,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M595,166 L595,222 L435,222 L435,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- ============ STAGE 2: Explore &amp; filter ============ -->
   <text x="40" y="214" font-size="14" font-weight="700" fill="#B5791E">2. EXPLORE &amp; FILTER THE CHECKLIST</text>
@@ -45,8 +49,10 @@
     <text x="435" y="272" text-anchor="middle" fill="#8a7452" font-size="11">division / order / family / genus</text>
   </g>
 
-  <!-- connector: stage 2 -> stage 3 (jog below stage-2 boxes, above stage-3 header) -->
-  <path d="M435,286 L435,302 L135,302 L135,346" fill="none" stroke="#B5791E" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
+  <!-- connector: stage 2 -> stage 3. Same fix as above: jog sits below the
+       stage-3 header baseline (336) so the vertical drop into funga_search()
+       at x=135 - directly under that header's left-aligned text - clears it. -->
+  <path d="M435,286 L435,344 L135,344 L135,346" fill="none" stroke="#B5791E" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
 
   <!-- ============ STAGE 3: Resolve your own names ============ -->
   <text x="40" y="336" font-size="14" font-weight="700" fill="#B5791E">3. RESOLVE YOUR OWN NAME LIST</text>

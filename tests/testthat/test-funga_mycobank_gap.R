@@ -164,3 +164,68 @@ test_that("funga_mycobank_gap reuses a previously downloaded MycoBank list", {
                        save = FALSE, html_report = FALSE, mycobank_dir = mb_dir, verbose = FALSE)
   )
 })
+
+
+test_that("funga_mycobank_gap writes a real .xlsx file when save = TRUE", {
+  mb_dir <- .mycobank_mock_dir()
+  .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
+  out_dir <- withr::local_tempdir()
+
+  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+                               check_locality = FALSE, save = TRUE, html_report = FALSE,
+                               mycobank_dir = mb_dir, dir = out_dir,
+                               filename = "mb_gap", verbose = FALSE)
+
+  expect_true(file.exists(file.path(out_dir, "mb_gap.xlsx")))
+  expect_gt(nrow(result), 0)
+})
+
+
+test_that("funga_mycobank_gap warns and caps checks at max_check", {
+  skip_if_not_installed("chromote")
+
+  mb_dir <- .mycobank_mock_dir()
+  .mock_funga_mycobank_ffb(character(0))  # all 4 species-level names are "missing"
+
+  fake_session <- structure(list(close = function(...) invisible(NULL)), class = "fake_session")
+  testthat::local_mocked_bindings(
+    ChromoteSession = list(new = function(...) fake_session),
+    .package = "chromote"
+  )
+  n_calls <- 0
+  testthat::local_mocked_bindings(
+    .mycobank_page_locality = function(session, url) {
+      n_calls <<- n_calls + 1
+      list(locality = NA_character_, substrate = NA_character_)
+    },
+    .package = "fungaR"
+  )
+
+  expect_warning(
+    result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+                                 check_locality = TRUE, max_check = 2,
+                                 save = FALSE, html_report = FALSE,
+                                 mycobank_dir = mb_dir, verbose = FALSE),
+    "max_check"
+  )
+  expect_equal(n_calls, 2)
+  expect_gt(nrow(result), 2)  # more candidates exist than were checked
+})
+
+
+test_that("funga_mycobank_gap skips the locality check gracefully without chromote", {
+  mb_dir <- .mycobank_mock_dir()
+  .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
+
+  testthat::local_mocked_bindings(
+    requireNamespace = function(pkg, ...) if (identical(pkg, "chromote")) FALSE else TRUE,
+    .package = "base"
+  )
+
+  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+                               check_locality = TRUE, save = FALSE, html_report = FALSE,
+                               mycobank_dir = mb_dir, verbose = FALSE)
+
+  expect_false("MycoBank_Locality" %in% names(result))
+  expect_gt(nrow(result), 0)
+})

@@ -299,11 +299,11 @@ or REFLORA.
 ``` r
 library(fungaR)
 
-gap <- funga_distribution_gap(taxon = "Phellinus piptadeniae")
+gap <- funga_distribution_gap(taxon = "Phellinotus piptadeniae")
 
 # Restrict the check to two states, using only GBIF
-gap_ba_pe <- funga_distribution_gap(taxon = "Phellinus piptadeniae",
-                                    state = c("Bahia", "Pernambuco"),
+gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
+                                    state = c("Minas Gerais", "Pernambuco"),
                                     sources = "gbif")
 ```
 
