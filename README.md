@@ -105,16 +105,27 @@ specific versions, or all available versions.
 library(fungaR)
 
 # Download the latest dataset version (default)
-funga_download(dir = "funga_download")
+funga_download(
+ dir = "funga_download"
+)
 
 # Download a specific version
-funga_download(version = "393.418", dir = "funga_download")
+funga_download(
+ version = "393.418", 
+ dir = "funga_download"
+)
 
 # Download multiple versions
-funga_download(version = c("393.418", "392.417"), dir = "funga_download")
+funga_download(
+ version = c("393.418", "392.417"), 
+ dir = "funga_download"
+)
 
 # Download all available versions (large download!)
-funga_download(version = "all", dir = "funga_download")
+funga_download(
+ version = "all", 
+ dir = "funga_download"
+)
 ```
 
 #### *3. `funga_parse`: Parse downloaded DwC-A datasets*
@@ -154,9 +165,9 @@ a separate named host-taxon field.
 ``` r
 library(fungaR)
 
-# All accepted species in Xylariaceae
-xylariaceae <- funga_records(taxon = "Xylariaceae",
-                             taxonomicStatus = "NOME_ACEITO")
+# All accepted species in Hymenochaetaceae
+hymeno <- funga_records(taxon = "Hymenochaetaceae",
+                        taxonomicStatus = "NOME_ACEITO")
 
 # Accepted species endemic to Bahia
 bahia_endemics <- funga_records(state = "Bahia",
@@ -171,7 +182,11 @@ caatinga_lichens <- funga_records(phytogeographicDomain = "Caatinga",
 root_associates <- funga_records(habitat = "Planta viva - raiz")
 
 # Save the result to a CSV file
-funga_records(taxon = "Trichoderma", save = TRUE, dir = "funga_records")
+funga_records(
+ taxon = "Trichoderma", 
+ save = TRUE, 
+ dir = "funga_records"
+)
 ```
 
 #### *5. `funga_search` and `funga_match`: Resolve your own species names*
