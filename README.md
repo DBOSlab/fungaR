@@ -323,7 +323,7 @@ gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
   down to species, on FFB’s fungi hierarchy
 - Data Cleaning: Automated parsing and standardization of DwC-A fields
 - Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and
-  REFLORA to flag species and state records missing from FFB
+  Reflora to flag species and state records missing from FFB
 - Interactive HTML Reports: `funga_mycobank_gap()` and
   `funga_distribution_gap()` write filterable, downloadable HTML reports
   alongside their spreadsheet output
