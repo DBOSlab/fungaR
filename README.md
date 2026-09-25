@@ -337,9 +337,9 @@ Full function documentation and articles are available at the `fungaR`
 
 ## Citation
 
-Cardoso, D. & Drechsler-Santos, E.R. 2026. fungaR: An R Package for
-Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do
-Brasil Platform. <https://github.com/dboslab/fungaR>
+Cardoso, D. & Drechsler-Santos, E.R. 2026. fungaR: Tools for Accessing,
+Analyzing, and Curating Fungal Data from the Flora e Funga do Brasil
+Platform. <https://github.com/dboslab/fungaR>
 
 ## Contributing
 

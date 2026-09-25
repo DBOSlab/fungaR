@@ -48,6 +48,8 @@ Suggests:
     DT,
     htmltools,
     chromote
+Remotes:
+    DBOSlab/refloraR
 URL:
     https://dboslab.github.io/fungaR-website/,
     https://github.com/dboslab/fungaR
