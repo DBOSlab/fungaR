@@ -116,8 +116,16 @@
 #'   when \code{save = TRUE}. Defaults to \code{"funga_records_search"}.
 #'
 #' @return A \code{data.frame} of FFB taxon records matching the requested
-#'   filters, with one row per taxon. If \code{save = TRUE}, the result is also
-#'   written to \code{<dir>/<filename>.csv}.
+#'   filters, with one row per taxon, appended with the corresponding
+#'   distribution and species-profile information for that taxon:
+#'   \code{state}, \code{phytogeographicDomain}, \code{endemism},
+#'   \code{lifeForm}, \code{habitat}, and \code{vegetationType}. Since a
+#'   single taxon can have several distribution/species-profile records
+#'   (e.g. occurring in multiple states, or recorded on multiple
+#'   substrates), each of these columns concatenates all distinct values
+#'   for that taxon with \code{" | "} rather than multiplying rows. If
+#'   \code{save = TRUE}, the result is also written to
+#'   \code{<dir>/<filename>.csv}.
 #'
 #' @section Database caching behavior:
 #' The FFB dataset is downloaded only once and cached locally in the
@@ -141,9 +149,9 @@
 #'
 #' @examples
 #' \dontrun{
-#' # All accepted species in Xylariaceae (downloads + parses automatically, caches result)
-#' xylariaceae <- funga_records(taxon = "Xylariaceae",
-#'                              taxonomicStatus = "NOME_ACEITO")
+#' # All accepted species in Hymenochaetaceae (downloads + parses automatically, caches result)
+#' hymeno <- funga_records(taxon = "Hymenochaetaceae",
+#'                         taxonomicStatus = "NOME_ACEITO")
 #'
 #' # Accepted species endemic to Bahia
 #' bahia_endemics <- funga_records(state = "Bahia",

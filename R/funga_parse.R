@@ -91,7 +91,7 @@
 #'
 #' # Step 4 - Filter the checklist with funga_records() (downloads/parses
 #' # automatically and reuses the cached data from Steps 1-2 above)
-#' records <- funga_records(taxon = "Fabaceae",
+#' records <- funga_records(taxon = "Hymenochaetaceae",
 #'                          taxonomicStatus = "NOME_ACEITO")
 #' }
 #'
