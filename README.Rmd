@@ -262,7 +262,7 @@ gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
 - Offline Capability: Parse and analyze downloaded data without internet connection
 - Checklist Filtering: Browse and filter the FFB fungal checklist by taxonomic, geographic, and trait-based (including substrate/host) criteria without an input name list
 - Name Resolution: Exact and fuzzy matching of your own species lists against the FFB checklist, including synonym resolution
-- Taxonomic Hierarchy: Retrieve child taxa at any rank, from division down to species, on FFB's real fungi hierarchy
+- Taxonomic Hierarchy: Retrieve child taxa at any rank, from division down to species, on FFB's fungi hierarchy
 - Data Cleaning: Automated parsing and standardization of DwC-A fields
 - Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and REFLORA to flag species and state records missing from FFB
 - Interactive HTML Reports: `funga_mycobank_gap()` and `funga_distribution_gap()` write filterable, downloadable HTML reports alongside their spreadsheet output

@@ -320,7 +320,7 @@ gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
 - Name Resolution: Exact and fuzzy matching of your own species lists
   against the FFB checklist, including synonym resolution
 - Taxonomic Hierarchy: Retrieve child taxa at any rank, from division
-  down to species, on FFB’s real fungi hierarchy
+  down to species, on FFB’s fungi hierarchy
 - Data Cleaning: Automated parsing and standardization of DwC-A fields
 - Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and
   REFLORA to flag species and state records missing from FFB
