@@ -1,0 +1,319 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+# fungaR <img src="inst/figures/fungaR_hex_sticker.png" align="right" alt="" width="120" />
+
+<!-- badges: start -->
+
+[![Codecov test
+coverage](https://codecov.io/gh/DBOSlab/fungaR/graph/badge.svg)](https://app.codecov.io/gh/DBOSlab/fungaR)
+[![Test
+Coverage](https://github.com/DBOSlab/fungaR/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/DBOSlab/fungaR/actions/workflows/test-coverage.yaml)
+[![R-CMD-check](https://github.com/DBOSlab/fungaR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/DBOSlab/fungaR/actions/workflows/R-CMD-check.yaml)
+[![License:
+MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<!-- badges: end -->
+
+`fungaR` is an R package for accessing, analyzing, and curating fungal
+taxonomic and distributional data from the [Flora e Funga do Brasil
+(FFB)](https://floradobrasil.jbrj.gov.br/consulta/) platform, maintained
+by the Rio de Janeiro Botanical Garden. It provides a comprehensive
+interface to download, parse, filter, and explore Darwin Core Archive
+(DwC-A) datasets from the [FFB
+IPT](https://ipt.jbrj.gov.br/jbrj/resource?r=lista_especies_flora_brasil)
+data portal — from browsing the checklist by taxonomic, geographic, and
+trait-based criteria (including fungi-specific traits such as
+nutritional mode, substrate/host, and lichenization status) to resolving
+and matching your own species name lists against it.
+
+Beyond data retrieval, `fungaR` assists taxonomic experts contributing
+to FFB by cross-checking [MycoBank](https://www.mycobank.org) and
+Brazilian occurrence repositories ([GBIF](https://www.gbif.org),
+[speciesLink](https://specieslink.net), and the [Reflora Virtual
+Herbarium](https://ipt.jbrj.gov.br/reflora/)) to flag fungal species and
+state records that are plausibly Brazilian but still missing from the
+platform.
+
+## Workflow
+
+<img src="inst/figures/fungaR_workflow.svg" alt="fungaR workflow diagram" width="100%" />
+
+## Installation
+
+You can install the development version of `fungaR` from
+[GitHub](https://github.com/DBOSlab/fungaR) with:
+
+``` r
+if (!requireNamespace("BiocManager", quietly = TRUE))
+install.packages("BiocManager")
+
+# Install the development version of fungaR from GitHub,
+# together with its required dependencies
+BiocManager::install("DBOSlab/fungaR", dependencies = TRUE)
+```
+
+``` r
+library(fungaR)
+```
+
+## Usage
+
+`fungaR` supports a full workflow for working with Flora e Funga do
+Brasil fungal data:
+
+- Check available versions with `funga_version()`
+- Download datasets with `funga_download()`
+- Parse datasets with `funga_parse()`
+- Filter and retrieve checklist records with `funga_records()`
+- Resolve your own species names against the checklist with
+  `funga_search()` and `funga_match()`
+- Explore the taxonomic hierarchy with `funga_get_children_taxa()`
+- Curate new records with `funga_mycobank_gap()` and
+  `funga_distribution_gap()`
+
+Most functions download and parse the FFB dataset automatically and
+cache it locally, so you rarely need to call
+`funga_download()`/`funga_parse()` yourself unless you want to inspect
+the raw data directly. Note that FFB publishes plants and fungi together
+in a single combined checklist — `funga_parse()` is what subsets
+everything down to the Fungi kingdom for use by the rest of the package.
+
+#### *1. `funga_version`: Check available dataset versions*
+
+Get metadata about available Flora e Funga do Brasil dataset versions,
+including version numbers, release dates, and whether they are the
+latest version.
+
+``` r
+library(fungaR)
+
+# Get all available versions
+versions_df <- funga_version()
+head(versions_df)
+
+# View specific version details
+versions_df[versions_df$Latest == TRUE, ]
+```
+
+#### *2. `funga_download`: Download Flora e Funga do Brasil datasets*
+
+Download taxonomic and distributional records in Darwin Core Archive
+(DwC-A) format. The function supports downloading the latest version,
+specific versions, or all available versions.
+
+``` r
+library(fungaR)
+
+# Download the latest dataset version (default)
+funga_download(dir = "funga_download")
+
+# Download a specific version
+funga_download(version = "393.418", dir = "funga_download")
+
+# Download multiple versions
+funga_download(version = c("393.418", "392.417"), dir = "funga_download")
+
+# Download all available versions (large download!)
+funga_download(version = "all", dir = "funga_download")
+```
+
+#### *3. `funga_parse`: Parse downloaded DwC-A datasets*
+
+Parse and organize locally downloaded Flora e Funga do Brasil datasets
+for analysis, keeping only the Fungi kingdom. This function works
+offline once datasets are downloaded, and returns a named list with a
+`taxon.txt`, `distribution.txt`, and `speciesprofile.txt` table (among
+others) per downloaded version.
+
+``` r
+library(fungaR)
+
+# Parse the latest downloaded version
+dwca_data <- funga_parse(path = "funga_download",
+                         version = "latest")
+
+# View structure of the parsed data
+names(dwca_data)
+names(dwca_data[["dwca_ffb_v393_418"]][["data"]])
+
+# Access specific data tables directly
+taxon_data <- dwca_data[["dwca_ffb_v393_418"]][["data"]][["taxon.txt"]]
+distribution_data <- dwca_data[["dwca_ffb_v393_418"]][["data"]][["distribution.txt"]]
+```
+
+#### *4. `funga_records`: Filter and retrieve checklist records*
+
+Browse and filter the FFB checklist directly by taxonomic, geographic,
+and trait-based criteria — no input name list required. Downloads and
+parses the dataset automatically (like `funga_search()`, reusing the
+local cache on repeated calls). For fungi, the `habitat` argument
+doubles as substrate/host information (e.g. `"Planta viva - raiz"`,
+`"Tronco em decomposicao"`, `"Outro fungo"`), since FFB does not publish
+a separate named host-taxon field.
+
+``` r
+library(fungaR)
+
+# All accepted species in Xylariaceae
+xylariaceae <- funga_records(taxon = "Xylariaceae",
+                             taxonomicStatus = "NOME_ACEITO")
+
+# Accepted species endemic to Bahia
+bahia_endemics <- funga_records(state = "Bahia",
+                                endemism = TRUE,
+                                taxonomicStatus = "NOME_ACEITO")
+
+# Lichenized fungi recorded in the Caatinga
+caatinga_lichens <- funga_records(phytogeographicDomain = "Caatinga",
+                                  lifeForm = "Liquenizado")
+
+# Fungi recorded growing on living plant roots (habitat = substrate/host)
+root_associates <- funga_records(habitat = "Planta viva - raiz")
+
+# Save the result to a CSV file
+funga_records(taxon = "Trichoderma", save = TRUE, dir = "funga_records")
+```
+
+#### *5. `funga_search` and `funga_match`: Resolve your own species names*
+
+Unlike `funga_records()`, which browses the checklist itself,
+`funga_search()` and `funga_match()` take a list of names *you already
+have* (e.g. from your own fungarium or field data) and resolve them
+against the FFB checklist — with exact matching first, then fuzzy
+(Levenshtein-distance) matching as a fallback for typos.
+
+``` r
+library(fungaR)
+
+# Resolve a single name (synonyms are resolved to their accepted name)
+funga_search("Hypocrea lixii")
+
+# Resolve a list, flagging exact vs. fuzzy matches
+splist <- c("Trichoderma harzianum", "Xylaria polymorpha", "Cookeina tricholoma")
+funga_search(splist, show_correct = TRUE, progress_bar = TRUE)
+
+# Compare two independent name lists, aligning names that resolve to the
+# same accepted taxon (e.g. checking your list against a collaborator's)
+splist1 <- c("Trichoderma harzianum", "Xylaria polymorpha", "Cookeina tricholoma")
+splist2 <- c("Hypocrea lixii", "Xylaria polymorpha", "Cookeina sulcipes")
+funga_match(splist1, splist2, include_all = TRUE)
+```
+
+#### *6. `funga_get_children_taxa`: Explore the taxonomic hierarchy*
+
+Retrieve all child taxa (species, subspecies, varieties, genera, etc.)
+below a given taxonomic name and rank — useful for getting every species
+in a genus, every genus in an order, and so on. Fungi are classified in
+FFB by Division (phylum-equivalent, e.g. Ascomycota, Basidiomycota)
+rather than Class, and FFB does not register a standalone family-rank
+record for Fungi — `rank = "family"` is still supported, matched
+directly against genus/species records’ classification column instead.
+
+``` r
+library(fungaR)
+
+# All species in a genus
+funga_get_children_taxa(taxon_name = "Trichoderma",
+                        rank = "genus",
+                        child_rank = "species")
+
+# All genera in a family, including synonyms
+funga_get_children_taxa(taxon_name = "Xylariaceae",
+                        rank = "family",
+                        child_rank = "genus",
+                        include_synonyms = TRUE)
+
+# All genera in an order
+funga_get_children_taxa(taxon_name = "Agaricales",
+                        rank = "order",
+                        child_rank = "genus")
+```
+
+## Data Curation Workflow
+
+`fungaR` also supports taxonomic experts in curating and expanding Flora
+e Funga do Brasil’s fungal coverage, by cross-checking global
+mycological and biodiversity repositories.
+
+#### *7. `funga_mycobank_gap`: Find species missing from FFB*
+
+Given a genus or order, cross-checks
+[MycoBank](https://www.mycobank.org)’s global name database against the
+current FFB checklist, flagging species-level names that exist in
+MycoBank but are not yet registered in FFB. Optionally cross-checks each
+candidate against GBIF/speciesLink for Brazil occurrence evidence, and
+returns a structured spreadsheet — including each name’s original
+MycoBank URL — ready for a taxonomist’s manual review.
+
+``` r
+library(fungaR)
+
+# MycoBank species in genus Trichoderma missing from FFB, with
+# Brazil-occurrence evidence from GBIF/speciesLink
+gap <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus")
+
+# Faster, without the occurrence cross-check
+gap_fast <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+                               check_occurrence = FALSE)
+```
+
+#### *8. `funga_distribution_gap`: Find candidate new state records*
+
+Given a fungal genus or species, checks GBIF, speciesLink, and the
+Reflora Virtual Herbarium (via the
+[`refloraR`](https://github.com/DBOSlab/refloraR) package) for specimen
+evidence in Brazilian states that are not currently listed in FFB’s
+official distribution for that taxon — flagging candidate new state
+records.
+
+``` r
+library(fungaR)
+
+gap <- funga_distribution_gap(taxon = "Trichoderma harzianum")
+
+# Restrict the check to two states, using only GBIF
+gap_ba_pe <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+                                    state = c("Bahia", "Pernambuco"),
+                                    sources = "gbif")
+```
+
+## Key Features
+
+- Comprehensive Data Access: Direct interface to the Flora e Funga do
+  Brasil IPT data portal
+- Version Control: Track and download specific dataset versions
+- Offline Capability: Parse and analyze downloaded data without internet
+  connection
+- Checklist Filtering: Browse and filter the FFB fungal checklist by
+  taxonomic, geographic, and trait-based (including substrate/host)
+  criteria without an input name list
+- Name Resolution: Exact and fuzzy matching of your own species lists
+  against the FFB checklist, including synonym resolution
+- Taxonomic Hierarchy: Retrieve child taxa at any rank, from division
+  down to species, on FFB’s real fungi hierarchy
+- Data Cleaning: Automated parsing and standardization of DwC-A fields
+- Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and
+  REFLORA to flag species and state records missing from FFB
+- Tidyverse Integration: Seamless integration with dplyr, tidyr, and
+  other tidyverse packages
+
+## Documentation
+
+Full function documentation and articles are available at the `fungaR`
+[website](https://dboslab.github.io/fungaR-website/).
+
+## Citation
+
+Cardoso, D. & Drechsler-Santos, E.R. 2026. fungaR: An R Package for
+Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do
+Brasil Platform. <https://github.com/dboslab/fungaR>
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request or
+open an issue on [GitHub](https://github.com/DBOSlab/fungaR/issues).
+
+## License
+
+`fungaR` is released under the MIT license. See the LICENSE file for
+more details.

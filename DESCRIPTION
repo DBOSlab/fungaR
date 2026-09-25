@@ -1,0 +1,52 @@
+Package: fungaR
+Type: Package
+Title: Tools for Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do Brasil Platform
+Version: 1.0.0
+Authors@R:
+    c(
+      person(given = "Domingos",
+             family = "Cardoso",
+             role = c("aut", "cre", "cph"),
+             email = "domingoscardoso@jbrj.gov.br",
+             comment = c(ORCID = "0000-0001-7072-2656"))
+    )
+Maintainer: Domingos Cardoso <domingoscardoso@jbrj.gov.br>
+Description: The 'fungaR' package provides a comprehensive interface to the
+    fungal data published by the Flora e Funga do Brasil (FFB) Platform, maintained by the
+    Rio de Janeiro Botanical Garden. It offers tools for downloading, parsing,
+    and analyzing taxonomic and distributional data published in Darwin Core Archive (DwC-A) format,
+    including fungi-specific traits such as nutritional mode, host/substrate, and lichenization status.
+    Beyond data retrieval, 'fungaR' also assists taxonomic experts contributing to the FFB
+    by simplifying the integration of new fungal species names and records from global mycological
+    repositories such as MycoBank, speciesLink, and GBIF.
+    The package is designed to streamline both data exploration and data curation workflows,
+    integrating seamlessly with the 'tidyverse' for downstream analyses and reproducible
+    research pipelines.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports:
+    stringr,
+    stringi,
+    stats,
+    utils,
+    finch,
+    tidyr,
+    magrittr,
+    dplyr,
+    purrr,
+    tibble,
+    rlang,
+    jsonlite,
+    openxlsx,
+    readxl
+Suggests:
+    testthat (>= 3.0.0),
+    withr,
+    refloraR
+URL:
+    https://dboslab.github.io/fungaR-website/,
+    https://github.com/dboslab/fungaR
+BugReports: https://github.com/DBOSlab/fungaR/issues
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0

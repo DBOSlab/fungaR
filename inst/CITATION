@@ -1,0 +1,20 @@
+# inst/CITATION
+
+citHeader("To cite the floraR package in publications, use:")
+
+bibentry(
+  bibtype = "Manual",
+  title = "floraR: Tools for Accessing, Analyzing, and Curating Data from the Flora e Funga do Brasil Platform",
+  author = c(
+    person(given = "Domingos",
+             family = "Cardoso",
+             role = c("aut", "cre", "cph"),
+             email = "domingoscardoso@jbrj.gov.br",
+             comment = c(ORCID = "0000-0001-7072-2656"))
+  ),
+  year = 2026,
+  note = "R package version 1.0.0",
+  url = "https://github.com/DBOSlab/floraR"
+)
+
+citFooter("This work was supported by CNPq and FINEP, with institutional support the Rio de Janeiro Botanical Garden (JBRJ).")
