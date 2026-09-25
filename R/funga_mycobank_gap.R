@@ -4,11 +4,10 @@
 #' Given a fungal genus or order, cross-checks \href{https://www.mycobank.org}{MycoBank}'s
 #' global nomenclatural database against the Flora e Funga do Brasil (FFB) checklist to
 #' flag species-level names that exist in MycoBank but are not currently registered in
-#' FFB. When \code{check_occurrence = TRUE} (default), each candidate name is further
-#' cross-checked against \href{https://www.gbif.org}{GBIF} (and, best-effort,
-#' \href{https://specieslink.net}{speciesLink}) for occurrence evidence from Brazil, so
-#' that taxonomic experts reviewing the output spreadsheet can prioritize candidates that
-#' already have independent evidence of occurring in the country.
+#' FFB. When \code{check_locality = TRUE} (default), each candidate's own MycoBank name
+#' page is additionally checked for a Brazilian type/specimen locality, so that taxonomic
+#' experts reviewing the output spreadsheet can prioritize candidates MycoBank itself
+#' already associates with Brazil.
 #'
 #' @details
 #' MycoBank does not offer a public search API suited to bulk automation, but it does
@@ -16,8 +15,16 @@
 #' (\url{https://www.mycobank.org/images/MBList.zip}). This function downloads and caches
 #' that export locally (the same way \code{\link{funga_download}} caches the FFB dataset),
 #' then filters it down to the requested genus or order using MycoBank's own
-#' \code{Classification} column, rather than attempting to scrape MycoBank's live,
-#' JavaScript-driven search interface.
+#' \code{Classification} column.
+#'
+#' The bulk export itself carries no locality information, so when
+#' \code{check_locality = TRUE} each missing candidate's individual MycoBank name page
+#' (its \code{MycoBank_URL}) is visited to read the "Location details" (and
+#' "Host/Substrate") reported for its type specimen. MycoBank's name pages are a
+#' JavaScript single-page application with no static HTML fallback, so this step requires
+#' the \pkg{chromote} package (and a local Chrome/Chromium installation) to drive a
+#' headless browser; if unavailable, this step is skipped with a message and the
+#' locality columns are left \code{NA} (the FFB comparison itself is unaffected).
 #'
 #' The FFB side of the comparison reuses \code{\link{funga_get_children_taxa}} to list every
 #' species (accepted and synonym) currently registered in FFB for the requested genus/order.
@@ -26,7 +33,7 @@
 #' funga_mycobank_gap(
 #'   taxon,
 #'   rank = c("genus", "order"),
-#'   check_occurrence = TRUE,
+#'   check_locality = TRUE,
 #'   max_check = 200,
 #'   version = "latest",
 #'   mycobank_dir = "mycobank_download",
@@ -44,17 +51,17 @@
 #' @param rank Character. Whether \code{taxon} is a \code{"genus"} (default) or an
 #'   \code{"order"}.
 #'
-#' @param check_occurrence Logical. If \code{TRUE} (default), each MycoBank name missing
-#'   from FFB is additionally queried against GBIF (and speciesLink, best-effort) for
-#'   Brazil-only occurrence records, adding evidence columns to help prioritize which
-#'   candidates are worth a taxonomist's manual review. Set to \code{FALSE} to skip this
-#'   (much faster, but without occurrence evidence).
+#' @param check_locality Logical. If \code{TRUE} (default), each MycoBank name missing
+#'   from FFB has its own MycoBank name page visited (via \pkg{chromote}) to read the
+#'   type specimen's reported locality and host/substrate, flagging candidates that
+#'   MycoBank itself already associates with Brazil. Set to \code{FALSE} to skip this
+#'   (much faster, but without locality evidence).
 #'
 #' @param max_check Numeric. Safety cap on how many missing candidates are sent through the
-#'   (comparatively slow, one-request-per-name) occurrence check when
-#'   \code{check_occurrence = TRUE}. Defaults to \code{200}; if more candidates are found,
+#'   (comparatively slow, one-page-load-per-name) locality check when
+#'   \code{check_locality = TRUE}. Defaults to \code{200}; if more candidates are found,
 #'   only the first \code{max_check} (alphabetically) are checked and a warning is issued.
-#'   Ignored when \code{check_occurrence = FALSE}.
+#'   Ignored when \code{check_locality = FALSE}.
 #'
 #' @param version Character. FFB dataset version to compare against. Defaults to
 #'   \code{"latest"}. Passed to \code{\link{funga_get_children_taxa}}.
@@ -96,21 +103,12 @@
 #'   \item{Current_name}{MycoBank's currently accepted name for this entry, when different
 #'     (i.e. when \code{Taxon_name} is itself a synonym).}
 #'   \item{MycoBank_URL}{Direct link to the name's MycoBank page.}
-#'   \item{GBIF_Brazil_records, GBIF_Brazil_states}{Occurrence count and states with GBIF
-#'     records from Brazil (only when \code{check_occurrence = TRUE}).}
-#'   \item{speciesLink_Brazil_records, speciesLink_Brazil_states}{Same, from speciesLink,
-#'     best-effort (see Note).}
+#'   \item{MycoBank_Locality, MycoBank_Substrate}{Type specimen locality and host/substrate
+#'     as reported on the name's own MycoBank page (only when \code{check_locality = TRUE}).}
+#'   \item{MycoBank_Brazil_Evidence}{Logical; \code{TRUE} when \code{MycoBank_Locality}
+#'     mentions Brazil (only when \code{check_locality = TRUE}).}
 #'   \item{In_FFB}{Always \code{FALSE} (kept for clarity when combining with other tables).}
 #' }
-#'
-#' @note
-#' speciesLink's public API endpoint has, at the time of writing, an SSL certificate that
-#' does not match its own hostname, which causes standard HTTPS clients (including R's) to
-#' refuse the connection. This function therefore treats speciesLink evidence as strictly
-#' best-effort: if the request fails for any reason, the corresponding columns are simply
-#' \code{NA} rather than aborting the function. GBIF is the dependable primary evidence
-#' source (and already aggregates a large share of Brazilian collections, including many
-#' also published through speciesLink).
 #'
 #' @seealso \code{\link{funga_distribution_gap}}, \code{\link{funga_get_children_taxa}}
 #'
@@ -120,24 +118,23 @@
 #' @examples
 #' \dontrun{
 #' # Species-level names in MycoBank for genus Trichoderma missing from FFB,
-#' # with Brazil-occurrence evidence from GBIF/speciesLink
+#' # with each candidate's own MycoBank locality/substrate
 #' gap <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus")
 #'
-#' # Faster, without the occurrence cross-check
+#' # Faster, without the locality check
 #' gap_fast <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
-#'                                check_occurrence = FALSE)
+#'                                check_locality = FALSE)
 #' }
 #'
-#' @importFrom utils download.file unzip URLencode
+#' @importFrom utils download.file unzip
 #' @importFrom openxlsx write.xlsx
 #' @importFrom readxl read_xlsx
-#' @importFrom jsonlite fromJSON
 #'
 #' @export
 
 funga_mycobank_gap <- function(taxon,
                                rank = c("genus", "order"),
-                               check_occurrence = TRUE,
+                               check_locality = TRUE,
                                max_check = 200,
                                version = "latest",
                                mycobank_dir = "mycobank_download",
@@ -253,44 +250,53 @@ funga_mycobank_gap <- function(taxon,
   )
 
   # ------------------------------------------------------------------------
-  # 4. Optional Brazil-occurrence cross-check (GBIF primary, speciesLink best-effort)
+  # 4. Optional per-candidate MycoBank locality check (via chromote)
   # ------------------------------------------------------------------------
-  if (check_occurrence && nrow(result) > 0) {
+  if (check_locality && nrow(result) > 0) {
 
-    if (nrow(result) > max_check) {
-      warning(sprintf(
-        "%d candidate names found, but only the first %d (of 'max_check') will be ",
-        nrow(result), max_check), "checked for Brazil occurrence evidence; ",
-        "increase 'max_check' to check them all.", call. = FALSE)
-      check_rows <- seq_len(max_check)
-    } else {
-      check_rows <- seq_len(nrow(result))
-    }
-
-    result$GBIF_Brazil_records <- NA_integer_
-    result$GBIF_Brazil_states <- NA_character_
-    result$speciesLink_Brazil_records <- NA_integer_
-    result$speciesLink_Brazil_states <- NA_character_
-
-    for (i in check_rows) {
+    if (!requireNamespace("chromote", quietly = TRUE)) {
       if (verbose) {
-        message(sprintf("  Checking Brazil occurrence %d/%d: %s",
-                        i, length(check_rows), result$Taxon_name[i]))
+        message("  Package 'chromote' (and a local Chrome/Chromium install) is required ",
+               "for the MycoBank locality check; skipping it. Install it with ",
+               "install.packages('chromote').")
       }
-      gbif <- .gbif_brazil_occurrence(result$Taxon_name[i])
-      splink <- .splink_brazil_occurrence(result$Taxon_name[i])
+    } else {
 
-      result$GBIF_Brazil_records[i] <- gbif$n_records
-      result$GBIF_Brazil_states[i] <- gbif$states
-      result$speciesLink_Brazil_records[i] <- splink$n_records
-      result$speciesLink_Brazil_states[i] <- splink$states
+      if (nrow(result) > max_check) {
+        warning(sprintf(
+          "%d candidate names found, but only the first %d (of 'max_check') will be ",
+          nrow(result), max_check), "checked for locality; increase 'max_check' to ",
+          "check them all.", call. = FALSE)
+        check_rows <- seq_len(max_check)
+      } else {
+        check_rows <- seq_len(nrow(result))
+      }
+
+      result$MycoBank_Locality <- NA_character_
+      result$MycoBank_Substrate <- NA_character_
+      result$MycoBank_Brazil_Evidence <- NA
+
+      session <- chromote::ChromoteSession$new()
+      on.exit(try(session$close(), silent = TRUE), add = TRUE)
+
+      for (i in check_rows) {
+        if (verbose) {
+          message(sprintf("  Checking MycoBank locality %d/%d: %s",
+                          i, length(check_rows), result$Taxon_name[i]))
+        }
+        loc <- .mycobank_page_locality(session, result$MycoBank_URL[i])
+        result$MycoBank_Locality[i] <- loc$locality
+        result$MycoBank_Substrate[i] <- loc$substrate
+        result$MycoBank_Brazil_Evidence[i] <- !is.na(loc$locality) &&
+          grepl("brazil|brasil", loc$locality, ignore.case = TRUE)
+      }
     }
   }
 
   rownames(result) <- NULL
 
   if (verbose) {
-    message(sprintf("\n\u2713 %d candidate species found in MycoBank but missing from FFB",
+    message(sprintf("\n✓ %d candidate species found in MycoBank but missing from FFB",
                     nrow(result)))
   }
 
@@ -321,8 +327,8 @@ funga_mycobank_gap <- function(taxon,
       n_mycobank = nrow(mb_sub),
       n_in_ffb = length(ffb_names),
       n_missing = nrow(result),
-      n_with_evidence = if (check_occurrence) {
-        sum(!is.na(result$GBIF_Brazil_records) & result$GBIF_Brazil_records > 0, na.rm = TRUE)
+      n_with_evidence = if ("MycoBank_Brazil_Evidence" %in% names(result)) {
+        sum(result$MycoBank_Brazil_Evidence, na.rm = TRUE)
       } else {
         NULL
       },

@@ -23,7 +23,6 @@ importFrom(dplyr,
   tibble
 )
 importFrom(finch,dwca_read)
-importFrom(jsonlite,fromJSON)
 importFrom(magrittr,"%>%")
 importFrom(openxlsx,write.xlsx)
 importFrom(purrr,pmap_chr)
@@ -38,7 +37,6 @@ importFrom(stringr,
 importFrom(tibble,add_column)
 importFrom(tidyr,unnest)
 importFrom(utils,
-  URLencode,
   adist,
   download.file,
   setTxtProgressBar,

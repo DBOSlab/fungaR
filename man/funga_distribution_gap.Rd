@@ -44,11 +44,13 @@ Defaults to \code{"funga_distribution_gap_<taxon>"}.}
 
 \item{html_report}{Logical. If \code{TRUE} (default), also writes a self-contained
 HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
-evidence-by-source breakdown, and the full state-by-state table as a sortable,
-filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
-Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
-missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
-unaffected).}
+evidence-by-source breakdown, the full state-by-state table, and the individual
+occurrence records (not aggregated) found in the new-state-record candidate states -
+each linking out to the specific record in its source database (GBIF occurrence page
+or REFLORA specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
+to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown}, \pkg{DT}, and
+\pkg{htmltools} packages; if any is missing, the report is skipped with a message
+(the \code{.xlsx} spreadsheet is unaffected).}
 
 \item{open_report}{Logical. If \code{TRUE} (default in interactive sessions), opens
 the rendered HTML report in the default browser.}

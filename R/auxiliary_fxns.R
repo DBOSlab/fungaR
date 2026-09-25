@@ -157,6 +157,41 @@
 
 
 #_______________________________________________________________________________
+# Fetch individual (record-level, not aggregated) GBIF occurrence records for a
+# given scientific name within one Brazilian state, each with a direct link to
+# the record's own GBIF occurrence page. Used by funga_distribution_gap() to
+# list the actual specimen/observation records backing a new-state-record
+# candidate, not just the state-level count. Never errors - any failure
+# returns a zero-row data frame with the expected columns. ####
+.gbif_brazil_state_records <- function(name, state, limit = 50) {
+  wanted <- c("key", "scientificName", "stateProvince", "municipality", "locality",
+             "recordedBy", "recordNumber", "eventDate", "institutionCode",
+             "collectionCode", "catalogNumber", "decimalLatitude", "decimalLongitude")
+  empty <- as.data.frame(setNames(rep(list(character(0)), length(wanted)), wanted),
+                         stringsAsFactors = FALSE)
+
+  url <- paste0("https://api.gbif.org/v1/occurrence/search?scientificName=",
+               utils::URLencode(name, reserved = TRUE),
+               "&country=BR&stateProvince=", utils::URLencode(state, reserved = TRUE),
+               "&limit=", limit)
+
+  res <- tryCatch(jsonlite::fromJSON(url), error = function(e) NULL)
+
+  if (is.null(res) || is.null(res$results) || !is.data.frame(res$results) ||
+      nrow(res$results) == 0) {
+    return(empty)
+  }
+
+  df <- res$results
+  for (col in setdiff(wanted, names(df))) df[[col]] <- NA
+  df <- df[, wanted, drop = FALSE]
+  df$GBIF_URL <- paste0("https://www.gbif.org/occurrence/", df$key)
+
+  df
+}
+
+
+#_______________________________________________________________________________
 # Query speciesLink's public web service for Brazil-only evidence of a given
 # scientific name. speciesLink's 'api.' endpoint has known reliability issues
 # (an SSL certificate that does not match its own hostname, as of this
@@ -188,6 +223,41 @@
 
 
 #_______________________________________________________________________________
+# Visit one MycoBank name page (a JavaScript single-page app with no static
+# HTML fallback - a plain HTTP GET only returns an empty Angular shell) via an
+# already-open chromote session, and extract the type specimen's "Location
+# details" and "Substrate details"/Host as reported on that page. Used by
+# funga_mycobank_gap() to check whether MycoBank itself already associates a
+# candidate name with a Brazilian locality. Never errors - any navigation or
+# parsing failure is caught and reported as NA, matching the package's
+# defensive pattern for other external lookups. ####
+.mycobank_page_locality <- function(session, url) {
+  txt <- tryCatch({
+    session$Page$navigate(url)
+    session$Page$loadEventFired(wait_ = TRUE, timeout_ = 20)
+    Sys.sleep(1.2)  # let Angular finish rendering the post-load data fetch
+    res <- session$Runtime$evaluate("document.body.innerText")
+    res$result$value
+  }, error = function(e) NA_character_)
+
+  if (is.na(txt) || !nzchar(txt)) {
+    return(list(locality = NA_character_, substrate = NA_character_))
+  }
+
+  lines <- strsplit(txt, "\n")[[1]]
+  next_line_after <- function(label) {
+    idx <- which(lines == label)
+    if (length(idx) == 0 || idx[1] >= length(lines)) return(NA_character_)
+    val <- trimws(lines[idx[1] + 1])
+    if (!nzchar(val)) NA_character_ else val
+  }
+
+  list(locality = next_line_after("Location details"),
+      substrate = next_line_after("Substrate details"))
+}
+
+
+#_______________________________________________________________________________
 # Render one of the funga_*_gap() HTML reports (inst/rmd/<template>) from a
 # pre-computed data list, mirroring the jabotR HTML-report pattern: KPI boxes
 # plus filterable/downloadable DT tables. Used by funga_mycobank_gap() and
@@ -209,13 +279,6 @@
   }
 
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  fig_dir <- file.path(dir, "figures")
-  if (!dir.exists(fig_dir)) dir.create(fig_dir, recursive = TRUE)
-
-  logo <- system.file("figures", "fungaR_hex_sticker.png", package = "fungaR")
-  if (nzchar(logo)) {
-    file.copy(logo, file.path(fig_dir, "fungaR_hex_sticker.png"), overwrite = TRUE)
-  }
 
   rmd_template <- system.file("rmd", template, package = "fungaR")
   if (!nzchar(rmd_template)) {

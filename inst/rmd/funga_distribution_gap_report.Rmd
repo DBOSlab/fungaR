@@ -34,11 +34,15 @@ library(DT)
 d <- readRDS(params$data_path)
 taxon <- d$taxon
 comma <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+# Absolute path so the logo embeds correctly regardless of the working
+# directory pandoc uses at render time (self-contained HTML needs a real,
+# resolvable file path, not one relative to the output directory).
+logo_path <- system.file("figures", "fungaR_hex_sticker.png", package = "fungaR")
 ```
 
 <div style="float:right; margin-top:-80px; margin-left:15px;">
   <a href="https://dboslab.github.io/fungaR-website/" target="_blank">
-    <img src="figures/fungaR_hex_sticker.png"
+    <img src="`r logo_path`"
          style="width:120px;transition:opacity 0.2s ease;"
          onmouseover="this.style.opacity='0.8'"
          onmouseout="this.style.opacity='1'"
@@ -143,6 +147,60 @@ DT::datatable(
     "New_state_record_candidate",
     backgroundColor = DT::styleEqual(c(TRUE, FALSE), c("#fde8ea", "#EEF6EC"))
   )
+```
+
+---
+
+## Individual Records for the New State Candidates
+
+Unlike the state-level table above, this table lists the actual **individual**
+occurrence records (not aggregated by state) found in Brazilian states that are
+not yet in FFB's official distribution for **`r taxon`** - each one linking out
+to the specific record in its source database (GBIF occurrence page, or the
+REFLORA specimen page).
+
+```{r table-records}
+recs <- d$records_detail
+
+if (is.null(recs) || nrow(recs) == 0) {
+  htmltools::p(
+    "No individual records were retrieved for the new-state-record candidates ",
+    "(GBIF/REFLORA may not have been among the requested 'sources', or no ",
+    "records were found).",
+    style = "color: #6c757d; font-style: italic;"
+  )
+} else {
+  if ("RecordLink" %in% names(recs)) {
+    recs$RecordLink <- ifelse(
+      !is.na(recs$RecordLink) & nzchar(recs$RecordLink),
+      paste0('<a href="', recs$RecordLink, '" target="_blank">View record</a>'),
+      ""
+    )
+  }
+
+  DT::datatable(
+    recs,
+    rownames = FALSE,
+    escape = FALSE,
+    filter = list(position = "top", clear = TRUE, plain = FALSE),
+    extensions = c("Buttons"),
+    caption = htmltools::tags$caption(
+      style = "caption-side: top; text-align: left; font-weight: bold;",
+      paste0("Table 3. All ", comma(nrow(recs)),
+             " individual record(s) found in new-state-record candidates for ",
+             taxon, ".")
+    ),
+    options = list(
+      pageLength = 20,
+      dom = "Bfrtip",
+      buttons = c("copy", "csv", "excel"),
+      scrollX = TRUE,
+      search = list(regex = TRUE, caseInsensitive = TRUE),
+      lengthMenu = list(c(10, 20, 50, 100, -1),
+                        c("10", "20", "50", "100", "All"))
+    )
+  )
+}
 ```
 
 ---

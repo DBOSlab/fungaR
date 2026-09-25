@@ -46,7 +46,8 @@ Suggests:
     refloraR,
     rmarkdown,
     DT,
-    htmltools
+    htmltools,
+    chromote
 URL:
     https://dboslab.github.io/fungaR-website/,
     https://github.com/dboslab/fungaR

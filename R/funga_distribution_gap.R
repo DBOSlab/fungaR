@@ -58,11 +58,13 @@
 #'
 #' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
 #'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
-#'   evidence-by-source breakdown, and the full state-by-state table as a sortable,
-#'   filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
-#'   Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
-#'   missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
-#'   unaffected).
+#'   evidence-by-source breakdown, the full state-by-state table, and the individual
+#'   occurrence records (not aggregated) found in the new-state-record candidate states -
+#'   each linking out to the specific record in its source database (GBIF occurrence page
+#'   or REFLORA specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
+#'   to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown}, \pkg{DT}, and
+#'   \pkg{htmltools} packages; if any is missing, the report is skipped with a message
+#'   (the \code{.xlsx} spreadsheet is unaffected).
 #'
 #' @param open_report Logical. If \code{TRUE} (default in interactive sessions), opens
 #'   the rendered HTML report in the default browser.
@@ -254,13 +256,69 @@ funga_distribution_gap <- function(taxon,
     )
     source_summary <- source_summary[!is.na(source_summary$n_states), ]
 
+    # ---- Individual occurrence records backing the new-state-record
+    # candidates (not just the state-level counts above), each linking out to
+    # the specific record in its source database. Capped to a sensible number
+    # of states so this stays fast even for widespread taxa.
+    candidate_states <- result$State[result$New_state_record_candidate]
+    candidate_states <- utils::head(candidate_states, 20)
+    records_detail <- data.frame(Source = character(0), State = character(0),
+                                 Municipality = character(0), Locality = character(0),
+                                 RecordedBy = character(0), EventDate = character(0),
+                                 Institution = character(0), CatalogNumber = character(0),
+                                 RecordLink = character(0), stringsAsFactors = FALSE)
+
+    if ("gbif" %in% sources && length(candidate_states) > 0) {
+      if (verbose) message("Fetching individual GBIF records for the new-state candidates...")
+      for (st in candidate_states) {
+        recs <- .gbif_brazil_state_records(taxon, st)
+        if (nrow(recs) > 0) {
+          records_detail <- rbind(records_detail, data.frame(
+            Source = "GBIF",
+            State = st,
+            Municipality = recs$municipality,
+            Locality = recs$locality,
+            RecordedBy = recs$recordedBy,
+            EventDate = recs$eventDate,
+            Institution = ifelse(!is.na(recs$institutionCode), recs$institutionCode, recs$collectionCode),
+            CatalogNumber = recs$catalogNumber,
+            RecordLink = recs$GBIF_URL,
+            stringsAsFactors = FALSE
+          ))
+        }
+      }
+    }
+
+    if ("reflora" %in% sources && length(candidate_states) > 0 &&
+        exists("reflora_result", inherits = FALSE) && !is.null(reflora_result) &&
+        nrow(reflora_result) > 0 && "stateProvince" %in% names(reflora_result)) {
+      reflora_norm_state <- .arg_check_state(reflora_result$stateProvince)
+      reflora_cand <- reflora_result[reflora_norm_state %in% candidate_states, , drop = FALSE]
+      if (nrow(reflora_cand) > 0) {
+        col <- function(nm) if (nm %in% names(reflora_cand)) reflora_cand[[nm]] else NA
+        records_detail <- rbind(records_detail, data.frame(
+          Source = "REFLORA",
+          State = .arg_check_state(reflora_cand$stateProvince),
+          Municipality = col("municipality"),
+          Locality = col("locality"),
+          RecordedBy = col("recordedBy"),
+          EventDate = if ("year" %in% names(reflora_cand)) as.character(col("year")) else NA_character_,
+          Institution = col("herbarium"),
+          CatalogNumber = col("recordNumber"),
+          RecordLink = col("bibliographicCitation"),
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+
     report_data <- list(
       taxon = taxon,
       n_in_ffb = length(ffb_states),
       n_states_total = nrow(result),
       n_new_candidates = sum(result$New_state_record_candidate),
       source_summary = source_summary,
-      result = result
+      result = result,
+      records_detail = records_detail
     )
 
     dir <- .arg_check_dir(dir)

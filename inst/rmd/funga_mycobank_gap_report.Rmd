@@ -34,11 +34,15 @@ library(DT)
 d <- readRDS(params$data_path)
 taxon <- d$taxon
 comma <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+# Absolute path so the logo embeds correctly regardless of the working
+# directory pandoc uses at render time (self-contained HTML needs a real,
+# resolvable file path, not one relative to the output directory).
+logo_path <- system.file("figures", "fungaR_hex_sticker.png", package = "fungaR")
 ```
 
 <div style="float:right; margin-top:-80px; margin-left:15px;">
   <a href="https://dboslab.github.io/fungaR-website/" target="_blank">
-    <img src="figures/fungaR_hex_sticker.png"
+    <img src="`r logo_path`"
          style="width:120px;transition:opacity 0.2s ease;"
          onmouseover="this.style.opacity='0.8'"
          onmouseout="this.style.opacity='1'"

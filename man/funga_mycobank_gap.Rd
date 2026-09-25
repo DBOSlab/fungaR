@@ -7,7 +7,7 @@
 funga_mycobank_gap(
   taxon,
   rank = c("genus", "order"),
-  check_occurrence = TRUE,
+  check_locality = TRUE,
   max_check = 200,
   version = "latest",
   mycobank_dir = "mycobank_download",
@@ -26,17 +26,17 @@ or \code{"Xylariales"}).}
 \item{rank}{Character. Whether \code{taxon} is a \code{"genus"} (default) or an
 \code{"order"}.}
 
-\item{check_occurrence}{Logical. If \code{TRUE} (default), each MycoBank name missing
-from FFB is additionally queried against GBIF (and speciesLink, best-effort) for
-Brazil-only occurrence records, adding evidence columns to help prioritize which
-candidates are worth a taxonomist's manual review. Set to \code{FALSE} to skip this
-(much faster, but without occurrence evidence).}
+\item{check_locality}{Logical. If \code{TRUE} (default), each MycoBank name missing
+from FFB has its own MycoBank name page visited (via \pkg{chromote}) to read the
+type specimen's reported locality and host/substrate, flagging candidates that
+MycoBank itself already associates with Brazil. Set to \code{FALSE} to skip this
+(much faster, but without locality evidence).}
 
 \item{max_check}{Numeric. Safety cap on how many missing candidates are sent through the
-(comparatively slow, one-request-per-name) occurrence check when
-\code{check_occurrence = TRUE}. Defaults to \code{200}; if more candidates are found,
+(comparatively slow, one-page-load-per-name) locality check when
+\code{check_locality = TRUE}. Defaults to \code{200}; if more candidates are found,
 only the first \code{max_check} (alphabetically) are checked and a warning is issued.
-Ignored when \code{check_occurrence = FALSE}.}
+Ignored when \code{check_locality = FALSE}.}
 
 \item{version}{Character. FFB dataset version to compare against. Defaults to
 \code{"latest"}. Passed to \code{\link{funga_get_children_taxa}}.}
@@ -79,10 +79,10 @@ A \code{data.frame}, one row per MycoBank species-level name found in the
   \item{Current_name}{MycoBank's currently accepted name for this entry, when different
     (i.e. when \code{Taxon_name} is itself a synonym).}
   \item{MycoBank_URL}{Direct link to the name's MycoBank page.}
-  \item{GBIF_Brazil_records, GBIF_Brazil_states}{Occurrence count and states with GBIF
-    records from Brazil (only when \code{check_occurrence = TRUE}).}
-  \item{speciesLink_Brazil_records, speciesLink_Brazil_states}{Same, from speciesLink,
-    best-effort (see Note).}
+  \item{MycoBank_Locality, MycoBank_Substrate}{Type specimen locality and host/substrate
+    as reported on the name's own MycoBank page (only when \code{check_locality = TRUE}).}
+  \item{MycoBank_Brazil_Evidence}{Logical; \code{TRUE} when \code{MycoBank_Locality}
+    mentions Brazil (only when \code{check_locality = TRUE}).}
   \item{In_FFB}{Always \code{FALSE} (kept for clarity when combining with other tables).}
 }
 }
@@ -90,11 +90,10 @@ A \code{data.frame}, one row per MycoBank species-level name found in the
 Given a fungal genus or order, cross-checks \href{https://www.mycobank.org}{MycoBank}'s
 global nomenclatural database against the Flora e Funga do Brasil (FFB) checklist to
 flag species-level names that exist in MycoBank but are not currently registered in
-FFB. When \code{check_occurrence = TRUE} (default), each candidate name is further
-cross-checked against \href{https://www.gbif.org}{GBIF} (and, best-effort,
-\href{https://specieslink.net}{speciesLink}) for occurrence evidence from Brazil, so
-that taxonomic experts reviewing the output spreadsheet can prioritize candidates that
-already have independent evidence of occurring in the country.
+FFB. When \code{check_locality = TRUE} (default), each candidate's own MycoBank name
+page is additionally checked for a Brazilian type/specimen locality, so that taxonomic
+experts reviewing the output spreadsheet can prioritize candidates MycoBank itself
+already associates with Brazil.
 }
 \details{
 MycoBank does not offer a public search API suited to bulk automation, but it does
@@ -102,30 +101,29 @@ publish a full, regularly-updated bulk export of every name in its database
 (\url{https://www.mycobank.org/images/MBList.zip}). This function downloads and caches
 that export locally (the same way \code{\link{funga_download}} caches the FFB dataset),
 then filters it down to the requested genus or order using MycoBank's own
-\code{Classification} column, rather than attempting to scrape MycoBank's live,
-JavaScript-driven search interface.
+\code{Classification} column.
+
+The bulk export itself carries no locality information, so when
+\code{check_locality = TRUE} each missing candidate's individual MycoBank name page
+(its \code{MycoBank_URL}) is visited to read the "Location details" (and
+"Host/Substrate") reported for its type specimen. MycoBank's name pages are a
+JavaScript single-page application with no static HTML fallback, so this step requires
+the \pkg{chromote} package (and a local Chrome/Chromium installation) to drive a
+headless browser; if unavailable, this step is skipped with a message and the
+locality columns are left \code{NA} (the FFB comparison itself is unaffected).
 
 The FFB side of the comparison reuses \code{\link{funga_get_children_taxa}} to list every
 species (accepted and synonym) currently registered in FFB for the requested genus/order.
 }
-\note{
-speciesLink's public API endpoint has, at the time of writing, an SSL certificate that
-does not match its own hostname, which causes standard HTTPS clients (including R's) to
-refuse the connection. This function therefore treats speciesLink evidence as strictly
-best-effort: if the request fails for any reason, the corresponding columns are simply
-\code{NA} rather than aborting the function. GBIF is the dependable primary evidence
-source (and already aggregates a large share of Brazilian collections, including many
-also published through speciesLink).
-}
 \examples{
 \dontrun{
 # Species-level names in MycoBank for genus Trichoderma missing from FFB,
-# with Brazil-occurrence evidence from GBIF/speciesLink
+# with each candidate's own MycoBank locality/substrate
 gap <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus")
 
-# Faster, without the occurrence cross-check
+# Faster, without the locality check
 gap_fast <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
-                               check_occurrence = FALSE)
+                               check_locality = FALSE)
 }
 
 }
