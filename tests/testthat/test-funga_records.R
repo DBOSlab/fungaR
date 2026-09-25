@@ -132,6 +132,33 @@ test_that("funga_records filters by lifeForm, habitat, and vegetationType", {
 })
 
 
+test_that("funga_records appends concatenated distribution/speciesprofile columns per taxon", {
+  fixture <- .funga_records_fixture()
+  .mock_funga_records(fixture)
+
+  result <- funga_records(verbose = FALSE)
+
+  expect_true(all(c("state", "phytogeographicDomain", "endemism",
+                    "lifeForm", "habitat", "vegetationType") %in% names(result)))
+
+  # id=1 (Trichoderma harzianum) has two distribution rows (Bahia, Minas
+  # Gerais) which should be concatenated with " | ", not multiply the row.
+  row1 <- result[result$taxonName == "Trichoderma harzianum", ]
+  expect_equal(nrow(row1), 1)
+  expect_setequal(strsplit(row1$state, " \\| ")[[1]], c("Bahia", "Minas Gerais"))
+  expect_setequal(strsplit(row1$phytogeographicDomain, " \\| ")[[1]],
+                  c("Caatinga", "Mata Atlantica"))
+
+  # id=6 (Trichoderma synonym) has no distribution/speciesprofile rows at all
+  row6 <- result[result$taxonName == "Trichoderma synonym", ]
+  expect_true(is.na(row6$state))
+  expect_true(is.na(row6$lifeForm))
+
+  # Row order must be unchanged by the left-join aggregation
+  expect_equal(result$taxonName, fixture$taxon_df$taxonName)
+})
+
+
 test_that("funga_records combines multiple filters with AND logic", {
   fixture <- .funga_records_fixture()
   .mock_funga_records(fixture)

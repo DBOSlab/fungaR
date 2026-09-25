@@ -27,7 +27,9 @@
 #'   verbose = TRUE,
 #'   save = TRUE,
 #'   dir = "funga_distribution_gap",
-#'   filename = NULL
+#'   filename = NULL,
+#'   html_report = TRUE,
+#'   open_report = interactive()
 #' )
 #'
 #' @param taxon Character. A single fungal genus or species name (e.g.
@@ -53,6 +55,17 @@
 #'
 #' @param filename Character. Name of the \code{.xlsx} file (without extension) to save.
 #'   Defaults to \code{"funga_distribution_gap_<taxon>"}.
+#'
+#' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
+#'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
+#'   evidence-by-source breakdown, and the full state-by-state table as a sortable,
+#'   filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
+#'   Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
+#'   missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
+#'   unaffected).
+#'
+#' @param open_report Logical. If \code{TRUE} (default in interactive sessions), opens
+#'   the rendered HTML report in the default browser.
 #'
 #' @return A \code{data.frame}, one row per Brazilian state with any occurrence evidence
 #'   for \code{taxon}, with columns:
@@ -97,7 +110,9 @@ funga_distribution_gap <- function(taxon,
                                    verbose = TRUE,
                                    save = TRUE,
                                    dir = "funga_distribution_gap",
-                                   filename = NULL) {
+                                   filename = NULL,
+                                   html_report = TRUE,
+                                   open_report = interactive()) {
 
   if (missing(taxon) || is.null(taxon) || !is.character(taxon) || length(taxon) != 1) {
     stop("'taxon' must be a single character string (one genus or species name).",
@@ -224,6 +239,38 @@ funga_distribution_gap <- function(taxon,
   if (save && nrow(result) > 0) {
     dir <- .arg_check_dir(dir)
     .save_xlsx(result, verbose = verbose, filename = filename, dir = dir)
+  }
+
+  if (html_report && nrow(result) > 0) {
+    source_summary <- data.frame(
+      source = c("FFB (official)", "GBIF", "speciesLink", "REFLORA"),
+      n_states = c(
+        length(ffb_states),
+        if ("gbif" %in% sources) nrow(gbif_states_df) else NA_integer_,
+        if ("speciesLink" %in% sources) length(splink_states) else NA_integer_,
+        if ("reflora" %in% sources) nrow(reflora_states_df) else NA_integer_
+      ),
+      stringsAsFactors = FALSE
+    )
+    source_summary <- source_summary[!is.na(source_summary$n_states), ]
+
+    report_data <- list(
+      taxon = taxon,
+      n_in_ffb = length(ffb_states),
+      n_states_total = nrow(result),
+      n_new_candidates = sum(result$New_state_record_candidate),
+      source_summary = source_summary,
+      result = result
+    )
+
+    dir <- .arg_check_dir(dir)
+    .funga_render_report(template = "funga_distribution_gap_report.Rmd",
+                         data_list = report_data,
+                         taxon = taxon,
+                         dir = dir,
+                         filename = filename,
+                         verbose = verbose,
+                         open_report = open_report)
   }
 
   return(result)

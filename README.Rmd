@@ -176,10 +176,10 @@ Unlike `funga_records()`, which browses the checklist itself, `funga_search()` a
 library(fungaR)
 
 # Resolve a single name (synonyms are resolved to their accepted name)
-funga_search("Hypocrea lixii")
+funga_search("Phellinus piptadeniae")
 
 # Resolve a list, flagging exact vs. fuzzy matches
-splist <- c("Trichoderma harzianum", "Xylaria polymorpha", "Cookeina tricholoma")
+splist <- c("Trichoderma harzianum", "Phellinus piptadeniae", "Cookeina tricholoma")
 funga_search(splist, show_correct = TRUE, progress_bar = TRUE)
 
 # Compare two independent name lists, aligning names that resolve to the
@@ -204,7 +204,7 @@ funga_get_children_taxa(taxon_name = "Trichoderma",
                         child_rank = "species")
 
 # All genera in a family, including synonyms
-funga_get_children_taxa(taxon_name = "Xylariaceae",
+funga_get_children_taxa(taxon_name = "Fomitopsidaceae",
                         rank = "family",
                         child_rank = "genus",
                         include_synonyms = TRUE)

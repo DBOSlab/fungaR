@@ -14,7 +14,9 @@ funga_mycobank_gap(
   verbose = TRUE,
   save = TRUE,
   dir = "funga_mycobank_gap",
-  filename = NULL
+  filename = NULL,
+  html_report = TRUE,
+  open_report = interactive()
 )
 }
 \arguments{
@@ -53,6 +55,17 @@ Defaults to \code{"funga_mycobank_gap"}.}
 
 \item{filename}{Character. Name of the \code{.xlsx} file (without extension) to save.
 Defaults to \code{"funga_mycobank_gap_<taxon>"}.}
+
+\item{html_report}{Logical. If \code{TRUE} (default), also writes a self-contained
+HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts,
+a families-affected breakdown, and the full candidate table as a sortable,
+filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
+Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
+missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
+unaffected).}
+
+\item{open_report}{Logical. If \code{TRUE} (default in interactive sessions), opens
+the rendered HTML report in the default browser.}
 }
 \value{
 A \code{data.frame}, one row per MycoBank species-level name found in the

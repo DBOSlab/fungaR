@@ -43,7 +43,10 @@ Imports:
 Suggests:
     testthat (>= 3.0.0),
     withr,
-    refloraR
+    refloraR,
+    rmarkdown,
+    DT,
+    htmltools
 URL:
     https://dboslab.github.io/fungaR-website/,
     https://github.com/dboslab/fungaR

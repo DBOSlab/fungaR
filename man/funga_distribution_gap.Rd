@@ -12,7 +12,9 @@ funga_distribution_gap(
   verbose = TRUE,
   save = TRUE,
   dir = "funga_distribution_gap",
-  filename = NULL
+  filename = NULL,
+  html_report = TRUE,
+  open_report = interactive()
 )
 }
 \arguments{
@@ -39,6 +41,17 @@ Defaults to \code{"funga_distribution_gap"}.}
 
 \item{filename}{Character. Name of the \code{.xlsx} file (without extension) to save.
 Defaults to \code{"funga_distribution_gap_<taxon>"}.}
+
+\item{html_report}{Logical. If \code{TRUE} (default), also writes a self-contained
+HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
+evidence-by-source breakdown, and the full state-by-state table as a sortable,
+filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
+Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
+missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
+unaffected).}
+
+\item{open_report}{Logical. If \code{TRUE} (default in interactive sessions), opens
+the rendered HTML report in the default browser.}
 }
 \value{
 A \code{data.frame}, one row per Brazilian state with any occurrence evidence

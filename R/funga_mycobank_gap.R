@@ -33,7 +33,9 @@
 #'   verbose = TRUE,
 #'   save = TRUE,
 #'   dir = "funga_mycobank_gap",
-#'   filename = NULL
+#'   filename = NULL,
+#'   html_report = TRUE,
+#'   open_report = interactive()
 #' )
 #'
 #' @param taxon Character. A single fungal genus or order name (e.g. \code{"Trichoderma"}
@@ -71,6 +73,17 @@
 #'
 #' @param filename Character. Name of the \code{.xlsx} file (without extension) to save.
 #'   Defaults to \code{"funga_mycobank_gap_<taxon>"}.
+#'
+#' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
+#'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts,
+#'   a families-affected breakdown, and the full candidate table as a sortable,
+#'   filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
+#'   Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
+#'   missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
+#'   unaffected).
+#'
+#' @param open_report Logical. If \code{TRUE} (default in interactive sessions), opens
+#'   the rendered HTML report in the default browser.
 #'
 #' @return A \code{data.frame}, one row per MycoBank species-level name found in the
 #'   requested genus/order that is absent from the current FFB checklist, with columns:
@@ -131,7 +144,9 @@ funga_mycobank_gap <- function(taxon,
                                verbose = TRUE,
                                save = TRUE,
                                dir = "funga_mycobank_gap",
-                               filename = NULL) {
+                               filename = NULL,
+                               html_report = TRUE,
+                               open_report = interactive()) {
 
   if (missing(taxon) || is.null(taxon) || !is.character(taxon) || length(taxon) != 1) {
     stop("'taxon' must be a single character string (one genus or order name).",
@@ -282,6 +297,47 @@ funga_mycobank_gap <- function(taxon,
   if (save && nrow(result) > 0) {
     dir <- .arg_check_dir(dir)
     .save_xlsx(result, verbose = verbose, filename = filename, dir = dir)
+  }
+
+  if (html_report && nrow(result) > 0) {
+    extract_family <- function(classification) {
+      toks <- strsplit(classification, ",\\s*")[[1]]
+      fam <- toks[grepl("aceae$", toks)]
+      if (length(fam) == 0) NA_character_ else fam[length(fam)]
+    }
+    family_vec <- vapply(result$Classification, extract_family, character(1),
+                         USE.NAMES = FALSE)
+    family_gap <- as.data.frame(table(family_vec[!is.na(family_vec)]),
+                                stringsAsFactors = FALSE)
+    if (nrow(family_gap) > 0) {
+      names(family_gap) <- c("family", "n_missing")
+      family_gap <- family_gap[order(-family_gap$n_missing), ]
+      rownames(family_gap) <- NULL
+    }
+
+    report_data <- list(
+      taxon = taxon,
+      rank = rank,
+      n_mycobank = nrow(mb_sub),
+      n_in_ffb = length(ffb_names),
+      n_missing = nrow(result),
+      n_with_evidence = if (check_occurrence) {
+        sum(!is.na(result$GBIF_Brazil_records) & result$GBIF_Brazil_records > 0, na.rm = TRUE)
+      } else {
+        NULL
+      },
+      family_gap = family_gap,
+      result = result
+    )
+
+    dir <- .arg_check_dir(dir)
+    .funga_render_report(template = "funga_mycobank_gap_report.Rmd",
+                         data_list = report_data,
+                         taxon = taxon,
+                         dir = dir,
+                         filename = filename,
+                         verbose = verbose,
+                         open_report = open_report)
   }
 
   return(result)

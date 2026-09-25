@@ -188,6 +188,72 @@
 
 
 #_______________________________________________________________________________
+# Render one of the funga_*_gap() HTML reports (inst/rmd/<template>) from a
+# pre-computed data list, mirroring the jabotR HTML-report pattern: KPI boxes
+# plus filterable/downloadable DT tables. Used by funga_mycobank_gap() and
+# funga_distribution_gap(). Degrades gracefully (message + skip) if the
+# reporting packages or the template are unavailable, so a missing Suggests
+# dependency never breaks the underlying analysis. ####
+.funga_render_report <- function(template, data_list, taxon, dir, filename,
+                                 verbose, open_report) {
+
+  if (!requireNamespace("rmarkdown", quietly = TRUE) ||
+      !requireNamespace("DT", quietly = TRUE) ||
+      !requireNamespace("htmltools", quietly = TRUE)) {
+    if (verbose) {
+      message("  Packages 'rmarkdown', 'DT', and 'htmltools' are required for the HTML ",
+             "report; skipping it (the spreadsheet was still saved). Install them with ",
+             "install.packages(c('rmarkdown', 'DT', 'htmltools')).")
+    }
+    return(invisible(FALSE))
+  }
+
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  fig_dir <- file.path(dir, "figures")
+  if (!dir.exists(fig_dir)) dir.create(fig_dir, recursive = TRUE)
+
+  logo <- system.file("figures", "fungaR_hex_sticker.png", package = "fungaR")
+  if (nzchar(logo)) {
+    file.copy(logo, file.path(fig_dir, "fungaR_hex_sticker.png"), overwrite = TRUE)
+  }
+
+  rmd_template <- system.file("rmd", template, package = "fungaR")
+  if (!nzchar(rmd_template)) {
+    if (verbose) message("  HTML report template not found; skipping.")
+    return(invisible(FALSE))
+  }
+
+  tmp_rds <- tempfile(fileext = ".rds")
+  saveRDS(data_list, tmp_rds)
+  on.exit(unlink(tmp_rds), add = TRUE)
+
+  html_out <- file.path(normalizePath(dir), paste0(filename, ".html"))
+
+  if (verbose) message("Rendering HTML report...")
+  render_ok <- tryCatch({
+    rmarkdown::render(
+      input = rmd_template,
+      output_file = html_out,
+      params = list(data_path = tmp_rds, taxon = taxon),
+      envir = new.env(parent = globalenv()),
+      quiet = !verbose
+    )
+    TRUE
+  }, error = function(e) {
+    if (verbose) message("  HTML report rendering failed: ", conditionMessage(e))
+    FALSE
+  })
+
+  if (render_ok) {
+    if (verbose) message("Report saved: ", html_out)
+    if (open_report && interactive()) utils::browseURL(html_out)
+  }
+
+  invisible(render_ok)
+}
+
+
+#_______________________________________________________________________________
 # Function to save log.txt file ####
 .save_log <- function(df,
                       filename = NULL,
