@@ -126,7 +126,7 @@
 #'     mentions Brazil (only when \code{check_locality = TRUE}).}
 #' }
 #'
-#' @seealso \code{\link{mycobank_gap}}, \code{\link{distribution_gap}}
+#' @seealso \code{\link{mycobank_gap}}, \code{\link{funga_distribution_gap}}
 #'
 #' @author
 #' Domingos Cardoso

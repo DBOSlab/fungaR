@@ -19,14 +19,14 @@
 #' REFLORA specimen data (used only if the \pkg{refloraR} package is installed).
 #'
 #' @usage
-#' distribution_gap(
+#' funga_distribution_gap(
 #'   taxon,
 #'   state = NULL,
 #'   sources = c("gbif", "speciesLink", "reflora"),
 #'   version = "latest",
 #'   verbose = TRUE,
 #'   save = TRUE,
-#'   dir = "distribution_gap",
+#'   dir = "funga_distribution_gap",
 #'   filename = NULL,
 #'   html_report = TRUE,
 #'   open_report = interactive()
@@ -51,10 +51,10 @@
 #'   \code{.xlsx} spreadsheet.
 #'
 #' @param dir Character. Directory where the spreadsheet is saved when \code{save = TRUE}.
-#'   Defaults to \code{"distribution_gap"}.
+#'   Defaults to \code{"funga_distribution_gap"}.
 #'
 #' @param filename Character. Name of the \code{.xlsx} file (without extension) to save.
-#'   Defaults to \code{"distribution_gap_<taxon>"}.
+#'   Defaults to \code{"funga_distribution_gap_<taxon>"}.
 #'
 #' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
 #'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
@@ -94,10 +94,10 @@
 #'
 #' @examples
 #' \dontrun{
-#' gap <- distribution_gap(taxon = "Trichoderma harzianum")
+#' gap <- funga_distribution_gap(taxon = "Trichoderma harzianum")
 #'
 #' # Restrict the check to two states, using only GBIF
-#' gap_ba_pe <- distribution_gap(taxon = "Trichoderma harzianum",
+#' gap_ba_pe <- funga_distribution_gap(taxon = "Trichoderma harzianum",
 #'                                     state = c("Bahia", "Pernambuco"),
 #'                                     sources = "gbif")
 #' }
@@ -106,13 +106,13 @@
 #'
 #' @export
 
-distribution_gap <- function(taxon,
+funga_distribution_gap <- function(taxon,
                                    state = NULL,
                                    sources = c("gbif", "speciesLink", "reflora"),
                                    version = "latest",
                                    verbose = TRUE,
                                    save = TRUE,
-                                   dir = "distribution_gap",
+                                   dir = "funga_distribution_gap",
                                    filename = NULL,
                                    html_report = TRUE,
                                    open_report = interactive()) {
@@ -125,7 +125,7 @@ distribution_gap <- function(taxon,
   taxon <- trimws(taxon)
 
   if (is.null(filename)) {
-    filename <- paste0("distribution_gap_", gsub("\\s+", "_", taxon))
+    filename <- paste0("funga_distribution_gap_", gsub("\\s+", "_", taxon))
   }
 
   # ------------------------------------------------------------------------
@@ -323,7 +323,7 @@ distribution_gap <- function(taxon,
     )
 
     dir <- .arg_check_dir(dir)
-    .funga_render_report(template = "distribution_gap_report.Rmd",
+    .funga_render_report(template = "funga_distribution_gap_report.Rmd",
                          data_list = report_data,
                          taxon = taxon,
                          dir = dir,

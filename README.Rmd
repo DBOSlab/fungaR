@@ -61,7 +61,7 @@ library(fungaR)
 - Explore the taxonomic hierarchy with `funga_get_children_taxa()`
 - Retrieve MycoBank information for a Brazilian taxon with `mycobank_records()`
 - Retrieve Index Fungorum information for a Brazilian taxon with `spfungorum_records()`
-- Curate new records with `mycobank_gap()`, `spfungorum_gap()`, and `distribution_gap()`
+- Curate new records with `mycobank_gap()`, `spfungorum_gap()`, and `funga_distribution_gap()`
 
 Most functions download and parse the FFB dataset automatically and cache it locally, so you rarely need to call `funga_download()`/`funga_parse()` yourself unless you want to inspect the raw data directly. Note that FFB publishes plants and fungi together in a single combined checklist — `funga_parse()` is what subsets everything down to the Fungi kingdom for use by the rest of the package.
 
@@ -221,7 +221,7 @@ funga_get_children_taxa(taxon_name = "Agaricales",
 
 ## Data Curation Workflow
 
-`fungaR` also supports taxonomic experts in curating and expanding Flora e Funga do Brasil's fungal coverage, by cross-checking global mycological and biodiversity repositories. `mycobank_gap()`, `mycobank_records()`, `spfungorum_gap()`, `spfungorum_records()`, and `distribution_gap()` all write their results in three complementary forms: the returned `data.frame`, a downloadable `.xlsx` spreadsheet, and — by default (`html_report = TRUE`) — a self-contained **HTML report** with KPI counts, breakdown tables, and the full candidate/record table as a sortable, filterable [`DT`](https://rstudio.github.io/DT/) widget with one-click **copy/CSV/Excel download** buttons, opened automatically in your browser in interactive sessions.
+`fungaR` also supports taxonomic experts in curating and expanding Flora e Funga do Brasil's fungal coverage, by cross-checking global mycological and biodiversity repositories. `mycobank_gap()`, `mycobank_records()`, `spfungorum_gap()`, `spfungorum_records()`, and `funga_distribution_gap()` all write their results in three complementary forms: the returned `data.frame`, a downloadable `.xlsx` spreadsheet, and — by default (`html_report = TRUE`) — a self-contained **HTML report** with KPI counts, breakdown tables, and the full candidate/record table as a sortable, filterable [`DT`](https://rstudio.github.io/DT/) widget with one-click **copy/CSV/Excel download** buttons, opened automatically in your browser in interactive sessions.
 
 #### _7. `mycobank_gap`: Find MycoBank species with Brazil evidence missing from FFB_
 
@@ -296,17 +296,17 @@ genus_records <- spfungorum_records(taxon = "Phellinotus", rank = "genus")
 
 
 
-#### _11. `distribution_gap`: Find candidate new state records_
+#### _11. `funga_distribution_gap`: Find candidate new state records_
 
 Given a fungal genus or species, checks GBIF, speciesLink, and the Reflora Virtual Herbarium (via the [`refloraR`](https://github.com/DBOSlab/refloraR) package) for specimen evidence in Brazilian states that are not currently listed in FFB's official distribution for that taxon — flagging candidate new state records. Its HTML report goes one step further than the state-level table, listing the actual **individual occurrence records** behind each new-state candidate, each linking directly to that record's page on GBIF or REFLORA.
 
 ```r
 library(fungaR)
 
-gap <- distribution_gap(taxon = "Phellinotus piptadeniae")
+gap <- funga_distribution_gap(taxon = "Phellinotus piptadeniae")
 
 # Restrict the check to two states, using only GBIF
-gap_ba_pe <- distribution_gap(taxon = "Phellinotus piptadeniae",
+gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
                                     state = c("Minas Gerais", "Pernambuco"),
                                     sources = "gbif")
 ```
@@ -322,7 +322,7 @@ gap_ba_pe <- distribution_gap(taxon = "Phellinotus piptadeniae",
 - Taxonomic Hierarchy: Retrieve child taxa at any rank, from division down to species, on FFB's fungi hierarchy
 - Data Cleaning: Automated parsing and standardization of DwC-A fields
 - Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and Reflora to flag species and state records missing from FFB, or retrieve MycoBank records for a Brazilian taxon directly
-- Interactive HTML Reports: `mycobank_gap()`, `mycobank_records()`, and `distribution_gap()` write filterable, downloadable HTML reports alongside their spreadsheet output
+- Interactive HTML Reports: `mycobank_gap()`, `mycobank_records()`, and `funga_distribution_gap()` write filterable, downloadable HTML reports alongside their spreadsheet output
 - Tidyverse Integration: Seamless integration with dplyr, tidyr, and other tidyverse packages
 
 

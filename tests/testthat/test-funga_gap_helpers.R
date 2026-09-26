@@ -1,5 +1,5 @@
 # Unit tests for the internal helpers behind mycobank_gap() and
-# distribution_gap() (auxiliary_fxns.R): GBIF/speciesLink/MycoBank
+# funga_distribution_gap() (auxiliary_fxns.R): GBIF/speciesLink/MycoBank
 # lookups and the shared HTML-report renderer. All external calls are mocked
 # so these tests run offline and do not depend on chromote/rmarkdown/DT
 # actually being usable in the test environment.

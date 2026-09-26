@@ -148,7 +148,7 @@ all_records <- mycobank_records(taxon = "Trichoderma", rank = "genus",
 
 }
 \seealso{
-\code{\link{mycobank_gap}}, \code{\link{distribution_gap}}
+\code{\link{mycobank_gap}}, \code{\link{funga_distribution_gap}}
 }
 \author{
 Domingos Cardoso

@@ -139,7 +139,7 @@
 
 #_______________________________________________________________________________
 # Query GBIF's public occurrence API for Brazil-only evidence of a given
-# scientific name. Used by mycobank_gap() and distribution_gap()
+# scientific name. Used by mycobank_gap() and funga_distribution_gap()
 # as the primary (reliable, no API key required) occurrence-evidence source.
 # Returns a list(n_records, states) and never errors -- any network/parsing
 # failure is caught and reported as NA so a single bad lookup never aborts a
@@ -175,7 +175,7 @@
 #_______________________________________________________________________________
 # Fetch individual (record-level, not aggregated) GBIF occurrence records for a
 # given scientific name within one Brazilian state, each with a direct link to
-# the record's own GBIF occurrence page. Used by distribution_gap() to
+# the record's own GBIF occurrence page. Used by funga_distribution_gap() to
 # list the actual specimen/observation records backing a new-state-record
 # candidate, not just the state-level count. Never errors - any failure
 # returns a zero-row data frame with the expected columns. ####
@@ -426,7 +426,7 @@
 # Render one of the funga_*_gap() HTML reports (inst/rmd/<template>) from a
 # pre-computed data list, mirroring the jabotR HTML-report pattern: KPI boxes
 # plus filterable/downloadable DT tables. Used by mycobank_gap() and
-# distribution_gap(). Degrades gracefully (message + skip) if the
+# funga_distribution_gap(). Degrades gracefully (message + skip) if the
 # reporting packages or the template are unavailable, so a missing Suggests
 # dependency never breaks the underlying analysis. ####
 .funga_render_report <- function(template, data_list, taxon, dir, filename,

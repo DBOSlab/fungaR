@@ -160,7 +160,7 @@ gap_fast <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
 
 }
 \seealso{
-\code{\link{mycobank_records}}, \code{\link{distribution_gap}},
+\code{\link{mycobank_records}}, \code{\link{funga_distribution_gap}},
   \code{\link{funga_get_children_taxa}}
 }
 \author{

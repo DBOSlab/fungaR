@@ -138,7 +138,7 @@
 #'   \item{In_FFB}{Always \code{FALSE} (kept for clarity when combining with other tables).}
 #' }
 #'
-#' @seealso \code{\link{mycobank_records}}, \code{\link{distribution_gap}},
+#' @seealso \code{\link{mycobank_records}}, \code{\link{funga_distribution_gap}},
 #'   \code{\link{funga_get_children_taxa}}
 #'
 #' @author

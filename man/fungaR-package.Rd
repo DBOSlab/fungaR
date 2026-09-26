@@ -35,7 +35,7 @@ still missing from FFB; \code{\link{mycobank_records}}, which
 retrieves every available MycoBank name for a given species, genus, or
 order, filtered by default to those with MycoBank Brazil evidence,
 regardless of whether they are already registered in FFB; and
-\code{\link{distribution_gap}}, which checks speciesLink and the
+\code{\link{funga_distribution_gap}}, which checks speciesLink and the
 Reflora Virtual Herbarium for specimen evidence of a taxon in Brazilian
 states not yet listed in its official FFB distribution.
 

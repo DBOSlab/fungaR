@@ -15,7 +15,9 @@ The first official release of the `fungaR` R package, designed to provide compre
 - `funga_get_children_taxa()`: Retrieve all child taxa (species, subspecies, varieties, genera, etc.) below a given taxonomic name and rank, following FFB's real fungi hierarchy (Division > Order > Genus > Species), with family handled via its classification column since FFB registers no standalone family-rank record for Fungi.
 - `mycobank_gap()`: Cross-check MycoBank's global name database against the FFB checklist for a given genus or order, returning by default only species-level names whose own MycoBank locality places them in Brazil but that are still missing from FFB. Beyond locality, each candidate's own MycoBank page is also scraped for its etymology, name type, type specimen, collector, and protolog citation, alongside the bulk export's own year and full synonymy text. Returns a structured spreadsheet including each name's original MycoBank URL as a clickable link, to assist taxonomic experts curating new records.
 - `mycobank_records()`: Retrieve every MycoBank name matching a given species, genus, or order, filtered by default to those with MycoBank Brazil evidence — a structured spreadsheet of MycoBank information (including etymology, type specimen, collector, and protolog citation) for a Brazilian taxon, independent of whether it is already registered in FFB.
-- `distribution_gap()`: Cross-check GBIF, speciesLink, and the Reflora Virtual Herbarium (via `refloraR`) for specimen evidence of a taxon in Brazilian states not yet listed in FFB's official distribution, flagging candidate new state records.
+- `spfungorum_gap()`: Cross-check Species Fungorum (Index Fungorum, Kew) against the FFB checklist for a given genus, via Index Fungorum's own public web-service API, returning by default only species-level names whose own reported locality places them in Brazil but that are still missing from FFB.
+- `spfungorum_records()`: Retrieve every Index Fungorum name matching a given species or genus, filtered by default to those with a Brazilian reported locality — a structured spreadsheet of Index Fungorum information for a Brazilian taxon, independent of whether it is already registered in FFB.
+- `funga_distribution_gap()`: Cross-check GBIF, speciesLink, and the Reflora Virtual Herbarium (via `refloraR`) for specimen evidence of a taxon in Brazilian states not yet listed in FFB's official distribution, flagging candidate new state records.
 - Automated data cleaning and standardization of taxon names, distribution data, and species profiles.
 - Support for offline data analysis once datasets are downloaded.
 - Integration with global mycological and biodiversity repositories (MycoBank, speciesLink, REFLORA, GBIF) for data curation workflows.
@@ -29,7 +31,7 @@ The first official release of the `fungaR` R package, designed to provide compre
 - **Taxonomic Hierarchy**: Retrieve child taxa at any rank, from division down to species, on FFB's real fungi hierarchy
 - **Distribution Data**: Extract endemism status and phytogeographic domain information
 - **Species Profiles**: Parse life form and substrate/host (via the `habitat` field) data
-- **Fungal Data Curation**: Cross-check MycoBank, GBIF, speciesLink, and REFLORA to flag species and state records missing from FFB
+- **Fungal Data Curation**: Cross-check MycoBank, Index Fungorum, GBIF, speciesLink, and REFLORA to flag species and state records missing from FFB, or retrieve MycoBank/Index Fungorum records for a Brazilian taxon directly
 - **Offline Analysis**: Work with downloaded data without internet connection
 
 ### Infrastructure
@@ -51,7 +53,8 @@ The package supports a full workflow for working with Flora e Funga do Brasil fu
 5. Resolve your own species names with `funga_search()` and `funga_match()`
 6. Explore the taxonomic hierarchy with `funga_get_children_taxa()`
 7. Retrieve MycoBank information for a Brazilian taxon with `mycobank_records()`
-8. Curate new records with `mycobank_gap()` and `distribution_gap()`
+8. Retrieve Index Fungorum information for a Brazilian taxon with `spfungorum_records()`
+9. Curate new records with `mycobank_gap()`, `spfungorum_gap()`, and `funga_distribution_gap()`
 
 Most functions download and parse the FFB dataset automatically and cache it locally, so `funga_download()`/`funga_parse()` rarely need to be called directly unless you want to inspect the raw data.
 
