@@ -5,6 +5,7 @@
                      "Trichoderma newspeciesii", "Trichoderma notaspecies"),
     Authors = c("Rifai", "Pers.", "A.Author", "B.Author"),
     Rank = c("sp.", "sp.", "sp.", "gen."),
+    `Year of effective publication` = c(1957, 1821, 2020, 1990),
     `Name status` = c("Legitimate", "Legitimate", "Legitimate", "Legitimate"),
     `MycoBank #` = c(100, 101, 102, 103),
     `Hyperlink to MB` = paste0("https://www.mycobank.org/page/Name details page/", 100:103),
