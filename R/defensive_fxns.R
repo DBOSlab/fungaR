@@ -90,15 +90,7 @@
 # Check the state input
 .arg_check_state <- function(x, return_abbrev = FALSE) {
 
-  valid_states <- c("Acre" = "AC", "Alagoas" = "AL", "Amap\u00e1" = "AP", "Amazonas" = "AM",
-                    "Bahia" = "BA", "Cear\u00e1" = "CE", "Distrito Federal" = "DF",
-                    "Esp\u00edrito Santo" = "ES", "Goi\u00e1s" = "GO", "Maranh\u00e3o" = "MA",
-                    "Mato Grosso" = "MT", "Mato Grosso do Sul" = "MS", "Minas Gerais" = "MG",
-                    "Par\u00e1" = "PA", "Para\u00edba" = "PB", "Paran\u00e1" = "PR", "Pernambuco" = "PE",
-                    "Piau\u00ed" = "PI", "Rio de Janeiro" = "RJ", "Rio Grande do Norte" = "RN",
-                    "Rio Grande do Sul" = "RS", "Rond\u00f4nia" = "RO", "Roraima" = "RR",
-                    "Santa Catarina" = "SC", "S\u00e3o Paulo" = "SP", "Sergipe" = "SE",
-                    "Tocantins" = "TO")
+  valid_states <- .br_states
 
   valid_states_full <- names(valid_states)
   valid_states_acronyms <- unname(valid_states)

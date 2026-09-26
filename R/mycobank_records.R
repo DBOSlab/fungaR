@@ -1,84 +1,74 @@
-#' Find fungal species with MycoBank Brazil evidence that are missing from FFB
+#' Retrieve MycoBank records for a taxon, filtered to Brazilian occurrence evidence
 #'
 #' @description
-#' Given a fungal genus or order, cross-checks \href{https://www.mycobank.org}{MycoBank}'s
-#' global nomenclatural database against the Flora e Funga do Brasil (FFB) checklist to
-#' find species-level names that MycoBank itself already associates with a Brazilian
-#' locality but that are not currently registered in FFB. This is not a general diff of
-#' the two databases: a MycoBank name missing from FFB is only returned when MycoBank's
-#' own type/specimen locality data indicates it occurs in Brazil, so taxonomic experts get
-#' a shortlist of genuinely plausible new national records rather than every unrelated
-#' MycoBank name in the genus/order.
+#' Given a fungal species, genus, or order, retrieves every matching
+#' \href{https://www.mycobank.org}{MycoBank} name and, by default, filters the result
+#' down to only the names whose own MycoBank locality data places them in Brazil -
+#' returning a structured spreadsheet of all available MycoBank information (including
+#' each name's original MycoBank URL) for those Brazilian records. Unlike
+#' \code{\link{mycobank_gap}}, this function does not cross-check FFB at all: it
+#' is a straightforward MycoBank retrieval tool, not a gap/comparison one.
 #'
 #' @details
 #' MycoBank does not offer a public search API suited to bulk automation, but it does
 #' publish a full, regularly-updated bulk export of every name in its database
 #' (\url{https://www.mycobank.org/images/MBList.zip}). This function downloads and caches
 #' that export locally (the same way \code{\link{funga_download}} caches the FFB dataset),
-#' then filters it down to the requested genus or order using MycoBank's own
-#' \code{Classification} column.
+#' then filters it down to the requested species, genus, or order.
 #'
 #' The bulk export itself carries no locality information, so determining Brazil evidence
-#' requires visiting each missing candidate's individual MycoBank name page (its
+#' requires visiting each matching name's individual MycoBank page (its
 #' \code{MycoBank_URL}) to read the "Location details" (and "Host/Substrate") reported for
 #' its type specimen. MycoBank's name pages are a JavaScript single-page application with
 #' no static HTML fallback, so this step (\code{check_locality = TRUE}, the default)
 #' requires the \pkg{chromote} package (and a local Chrome/Chromium installation) to drive
 #' a headless browser. When \code{require_brazil_evidence = TRUE} (the default), the
-#' returned table is filtered down to only the candidates whose MycoBank locality
-#' mentions Brazil; set it to \code{FALSE} to instead get every MycoBank name missing from
-#' FFB regardless of locality (with the evidence columns alongside, for manual review).
-#' Brazil-evidence filtering has no effect if \code{check_locality = FALSE}, since no
-#' locality data is available to filter on; a message explains this when it happens.
-#'
-#' The FFB side of the comparison reuses \code{\link{funga_get_children_taxa}} to list every
-#' species (accepted and synonym) currently registered in FFB for the requested genus/order.
+#' returned table is filtered down to only the names whose MycoBank locality mentions
+#' Brazil; set it to \code{FALSE} to instead get every matching MycoBank name regardless
+#' of locality (with the evidence columns alongside, for manual review). Brazil-evidence
+#' filtering has no effect if \code{check_locality = FALSE}, since no locality data is
+#' available to filter on; a message explains this when it happens.
 #'
 #' @usage
-#' funga_mycobank_gap(
+#' mycobank_records(
 #'   taxon,
-#'   rank = c("genus", "order"),
+#'   rank = c("species", "genus", "order"),
 #'   check_locality = TRUE,
 #'   require_brazil_evidence = TRUE,
 #'   max_check = 200,
-#'   version = "latest",
 #'   mycobank_dir = "mycobank_download",
 #'   verbose = TRUE,
 #'   save = TRUE,
-#'   dir = "funga_mycobank_gap",
+#'   dir = "mycobank_records",
 #'   filename = NULL,
 #'   html_report = TRUE,
 #'   open_report = interactive()
 #' )
 #'
-#' @param taxon Character. A single fungal genus or order name (e.g. \code{"Trichoderma"}
-#'   or \code{"Xylariales"}).
+#' @param taxon Character. A single fungal species, genus, or order name (e.g.
+#'   \code{"Trichoderma harzianum"}, \code{"Trichoderma"}, or \code{"Xylariales"}).
 #'
-#' @param rank Character. Whether \code{taxon} is a \code{"genus"} (default) or an
-#'   \code{"order"}.
+#' @param rank Character. Whether \code{taxon} is a \code{"species"} (default), a
+#'   \code{"genus"}, or an \code{"order"}.
 #'
-#' @param check_locality Logical. If \code{TRUE} (default), each MycoBank name missing
-#'   from FFB has its own MycoBank name page visited (via \pkg{chromote}) to read the
-#'   type specimen's reported locality and host/substrate, determining which candidates
-#'   MycoBank itself already associates with Brazil. Set to \code{FALSE} to skip this
-#'   (much faster, but without locality evidence, and \code{require_brazil_evidence} has
-#'   no effect).
+#' @param check_locality Logical. If \code{TRUE} (default), each matching MycoBank name
+#'   has its own MycoBank name page visited (via \pkg{chromote}) to read the type
+#'   specimen's reported locality and host/substrate, determining which names MycoBank
+#'   itself already associates with Brazil. Set to \code{FALSE} to skip this (much
+#'   faster, but without locality evidence, and \code{require_brazil_evidence} has no
+#'   effect).
 #'
-#' @param require_brazil_evidence Logical. If \code{TRUE} (default), the returned table is
-#'   filtered to only the candidates whose MycoBank locality mentions Brazil - i.e. names
-#'   MycoBank itself indicates occur in Brazil but that FFB is still missing. Set to
-#'   \code{FALSE} to instead return every MycoBank species-level name missing from FFB
-#'   regardless of locality (with \code{MycoBank_Brazil_Evidence} alongside for manual
-#'   review). Only meaningful when \code{check_locality = TRUE}.
+#' @param require_brazil_evidence Logical. If \code{TRUE} (default), the returned table
+#'   is filtered to only the names whose MycoBank locality mentions Brazil. Set to
+#'   \code{FALSE} to instead return every matching MycoBank name regardless of locality
+#'   (with \code{MycoBank_Brazil_Evidence} alongside for manual review). Only meaningful
+#'   when \code{check_locality = TRUE}.
 #'
-#' @param max_check Numeric. Safety cap on how many missing candidates are sent through the
+#' @param max_check Numeric. Safety cap on how many matching names are sent through the
 #'   (comparatively slow, one-page-load-per-name) locality check when
-#'   \code{check_locality = TRUE}. Defaults to \code{200}; if more candidates are found,
-#'   only the first \code{max_check} (alphabetically) are checked and a warning is issued.
+#'   \code{check_locality = TRUE}. Defaults to \code{200}; if more names are found, only
+#'   the first \code{max_check} (alphabetically) are checked and a warning is issued.
 #'   Ignored when \code{check_locality = FALSE}.
-#'
-#' @param version Character. FFB dataset version to compare against. Defaults to
-#'   \code{"latest"}. Passed to \code{\link{funga_get_children_taxa}}.
 #'
 #' @param mycobank_dir Character. Local directory used to cache the downloaded MycoBank
 #'   bulk export. Defaults to \code{"mycobank_download"}. Reused on subsequent calls to
@@ -90,14 +80,14 @@
 #'   \code{.xlsx} spreadsheet.
 #'
 #' @param dir Character. Directory where the spreadsheet is saved when \code{save = TRUE}.
-#'   Defaults to \code{"funga_mycobank_gap"}.
+#'   Defaults to \code{"mycobank_records"}.
 #'
 #' @param filename Character. Name of the \code{.xlsx} file (without extension) to save.
-#'   Defaults to \code{"funga_mycobank_gap_<taxon>"}.
+#'   Defaults to \code{"mycobank_records_<taxon>"}.
 #'
 #' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
 #'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts,
-#'   a families-affected breakdown, and the full candidate table as a sortable,
+#'   a families-affected breakdown, and the full record table as a sortable,
 #'   filterable \pkg{DT} widget with buttons to copy or download it as CSV/Excel.
 #'   Requires the \pkg{rmarkdown}, \pkg{DT}, and \pkg{htmltools} packages; if any is
 #'   missing, the report is skipped with a message (the \code{.xlsx} spreadsheet is
@@ -106,9 +96,8 @@
 #' @param open_report Logical. If \code{TRUE} (default in interactive sessions), opens
 #'   the rendered HTML report in the default browser.
 #'
-#' @return A \code{data.frame}, one row per MycoBank species-level name found in the
-#'   requested genus/order that is absent from the current FFB checklist and, by default,
-#'   whose MycoBank locality data indicates it occurs in Brazil, with columns:
+#' @return A \code{data.frame}, one row per matching MycoBank name and, by default, with
+#'   a Brazilian MycoBank locality, with columns:
 #' \describe{
 #'   \item{MycoBank_Number}{MycoBank's numeric identifier for the name.}
 #'   \item{Taxon_name}{The binomial as registered in MycoBank.}
@@ -135,28 +124,26 @@
 #'     the name's own MycoBank page (only when \code{check_locality = TRUE}).}
 #'   \item{MycoBank_Brazil_Evidence}{Logical; \code{TRUE} when \code{MycoBank_Locality}
 #'     mentions Brazil (only when \code{check_locality = TRUE}).}
-#'   \item{In_FFB}{Always \code{FALSE} (kept for clarity when combining with other tables).}
 #' }
 #'
-#' @seealso \code{\link{funga_mycobank_records}}, \code{\link{funga_distribution_gap}},
-#'   \code{\link{funga_get_children_taxa}}
+#' @seealso \code{\link{mycobank_gap}}, \code{\link{distribution_gap}}
 #'
 #' @author
 #' Domingos Cardoso
 #'
 #' @examples
 #' \dontrun{
-#' # Species-level MycoBank names for genus Trichoderma that MycoBank's own
-#' # locality data places in Brazil but that are still missing from FFB
-#' gap <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus")
+#' # All MycoBank information for a single species, only if MycoBank places
+#' # it in Brazil
+#' sp <- mycobank_records(taxon = "Trichoderma harzianum")
 #'
-#' # Every MycoBank name missing from FFB regardless of locality, for manual review
-#' gap_all <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
-#'                               require_brazil_evidence = FALSE)
+#' # Every MycoBank species-level name in genus Trichoderma with a Brazilian
+#' # MycoBank locality
+#' genus_records <- mycobank_records(taxon = "Trichoderma", rank = "genus")
 #'
-#' # Faster, without the locality check (no Brazil-evidence filtering possible)
-#' gap_fast <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
-#'                                check_locality = FALSE)
+#' # Every matching name regardless of locality, for manual review
+#' all_records <- mycobank_records(taxon = "Trichoderma", rank = "genus",
+#'                                       require_brazil_evidence = FALSE)
 #' }
 #'
 #' @importFrom utils download.file unzip
@@ -165,51 +152,32 @@
 #'
 #' @export
 
-funga_mycobank_gap <- function(taxon,
-                               rank = c("genus", "order"),
-                               check_locality = TRUE,
-                               require_brazil_evidence = TRUE,
-                               max_check = 200,
-                               version = "latest",
-                               mycobank_dir = "mycobank_download",
-                               verbose = TRUE,
-                               save = TRUE,
-                               dir = "funga_mycobank_gap",
-                               filename = NULL,
-                               html_report = TRUE,
-                               open_report = interactive()) {
+mycobank_records <- function(taxon,
+                                   rank = c("species", "genus", "order"),
+                                   check_locality = TRUE,
+                                   require_brazil_evidence = TRUE,
+                                   max_check = 200,
+                                   mycobank_dir = "mycobank_download",
+                                   verbose = TRUE,
+                                   save = TRUE,
+                                   dir = "mycobank_records",
+                                   filename = NULL,
+                                   html_report = TRUE,
+                                   open_report = interactive()) {
 
   if (missing(taxon) || is.null(taxon) || !is.character(taxon) || length(taxon) != 1) {
-    stop("'taxon' must be a single character string (one genus or order name).",
+    stop("'taxon' must be a single character string (one species, genus, or order name).",
          call. = FALSE)
   }
   rank <- match.arg(rank)
   taxon <- trimws(taxon)
 
   if (is.null(filename)) {
-    filename <- paste0("funga_mycobank_gap_", gsub("\\s+", "_", taxon))
+    filename <- paste0("mycobank_records_", gsub("\\s+", "_", taxon))
   }
 
   # ------------------------------------------------------------------------
-  # 1. FFB side: species (accepted + synonyms) already registered for taxon
-  # ------------------------------------------------------------------------
-  if (verbose) message("Retrieving the current FFB checklist for '", taxon, "'...")
-
-  ffb_species <- tryCatch({
-    funga_get_children_taxa(taxon_name = taxon, rank = rank, child_rank = "species",
-                            include_synonyms = TRUE, version = version, verbose = FALSE)
-  }, error = function(e) {
-    if (verbose) {
-      message("  '", taxon, "' was not found in the current FFB checklist ",
-             "(treating FFB's known species list as empty).")
-    }
-    data.frame()
-  })
-
-  ffb_names <- if (nrow(ffb_species) > 0) unique(ffb_species$taxonName) else character(0)
-
-  # ------------------------------------------------------------------------
-  # 2. MycoBank side: download/cache the bulk export, then filter
+  # 1. MycoBank side: download/cache the bulk export, then filter
   # ------------------------------------------------------------------------
   mycobank_dir <- .arg_check_dir(mycobank_dir)
   mb_file <- file.path(mycobank_dir, "MBList.xlsx")
@@ -232,70 +200,42 @@ funga_mycobank_gap <- function(taxon,
   if (verbose) message("Reading and filtering the MycoBank list...")
   mb <- readxl::read_xlsx(mb_file, sheet = "Sheet1")
 
-  is_species <- mb$Rank %in% "sp."
-  if (rank == "genus") {
+  if (rank == "species") {
+    is_species <- mb$Rank %in% "sp."
+    in_taxon <- mb[["Taxon name"]] %in% taxon
+  } else if (rank == "genus") {
+    is_species <- mb$Rank %in% "sp."
     in_taxon <- grepl(paste0("^", taxon, " "), mb[["Taxon name"]])
   } else {
+    is_species <- mb$Rank %in% "sp."
     classif_tokens <- strsplit(mb$Classification, ",\\s*")
     in_taxon <- vapply(classif_tokens, function(x) taxon %in% x, logical(1))
   }
   mb_sub <- mb[is_species & in_taxon & !is.na(mb[["Taxon name"]]), ]
+  mb_sub <- mb_sub[order(mb_sub[["Taxon name"]]), ]
 
   if (verbose) {
-    message("  Found ", nrow(mb_sub), " species-level name(s) in MycoBank for ",
+    message("  Found ", nrow(mb_sub), " matching MycoBank name(s) for ",
            rank, " '", taxon, "'.")
   }
 
-  # ------------------------------------------------------------------------
-  # 3. Names in MycoBank but absent from the FFB checklist
-  # ------------------------------------------------------------------------
-  # A candidate counts as "already in FFB" if EITHER its raw MycoBank name OR
-  # its MycoBank *currently accepted* name (falling back to the name itself
-  # when it has none) matches an FFB species. The Current-name check alone
-  # avoids flagging every obscure historical synonym of a species FFB already
-  # lists under a different name; the raw-name check is equally necessary
-  # because MycoBank and FFB sometimes disagree on which genus a name
-  # currently belongs to (e.g. MycoBank treats "Phellinotus neoaridus" as a
-  # synonym of "Fomitiporella neoarida", while FFB accepts it in Phellinotus)
-  # - checking only the effective name would then wrongly flag it as missing
-  # even though FFB's own accepted name matches MycoBank's raw name exactly.
-  effective_name <- ifelse(!is.na(mb_sub[["Current name"]]) & nzchar(mb_sub[["Current name"]]),
-                           mb_sub[["Current name"]], mb_sub[["Taxon name"]])
-  already_in_ffb <- mb_sub[["Taxon name"]] %in% ffb_names | effective_name %in% ffb_names
-  missing <- mb_sub[!already_in_ffb, ]
-  missing_effective_name <- effective_name[!already_in_ffb]
-
-  # One row per genuinely missing accepted species: prefer the row where the
-  # MycoBank name IS the accepted name (Taxon name == Current name / has no
-  # Current name), falling back to the first synonym row otherwise.
-  is_accepted_row <- missing[["Taxon name"]] == missing_effective_name |
-    is.na(missing[["Current name"]]) | !nzchar(missing[["Current name"]])
-  order_pref <- order(missing_effective_name, !is_accepted_row)
-  missing <- missing[order_pref, ][!duplicated(missing_effective_name[order_pref]), ]
-  missing <- missing[order(missing[["Taxon name"]]), ]
-
-  if (verbose) {
-    message("  ", nrow(missing), " of those resolve to a species not currently in FFB.")
-  }
-
   result <- data.frame(
-    MycoBank_Number = missing[["MycoBank #"]],
-    Taxon_name = missing[["Taxon name"]],
-    Authors = missing[["Authors"]],
-    Year = missing[["Year of effective publication"]],
-    Name_status = missing[["Name status"]],
-    Classification = missing[["Classification"]],
-    Current_name = missing[["Current name"]],
-    Synonymy = missing[["Synonymy"]],
-    MycoBank_URL = missing[["Hyperlink to MB"]],
-    In_FFB = logical(nrow(missing)),
+    MycoBank_Number = mb_sub[["MycoBank #"]],
+    Taxon_name = mb_sub[["Taxon name"]],
+    Authors = mb_sub[["Authors"]],
+    Year = mb_sub[["Year of effective publication"]],
+    Name_status = mb_sub[["Name status"]],
+    Classification = mb_sub[["Classification"]],
+    Current_name = mb_sub[["Current name"]],
+    Synonymy = mb_sub[["Synonymy"]],
+    MycoBank_URL = mb_sub[["Hyperlink to MB"]],
     stringsAsFactors = FALSE
   )
 
   # ------------------------------------------------------------------------
-  # 4. MycoBank locality check (via chromote) and Brazil-evidence filtering
+  # 2. MycoBank locality check (via chromote) and Brazil-evidence filtering
   # ------------------------------------------------------------------------
-  n_missing_any_locality <- nrow(result)
+  n_any_locality <- nrow(result)
 
   if (check_locality && nrow(result) > 0) {
 
@@ -306,14 +246,14 @@ funga_mycobank_gap <- function(taxon,
                "install.packages('chromote').")
         if (require_brazil_evidence) {
           message("  'require_brazil_evidence = TRUE' has no effect without the locality ",
-                 "check; returning all species missing from FFB instead.")
+                 "check; returning all matching names instead.")
         }
       }
     } else {
 
       if (nrow(result) > max_check) {
         warning(sprintf(
-          "%d candidate names found, but only the first %d (of 'max_check') will be ",
+          "%d matching name(s) found, but only the first %d (of 'max_check') will be ",
           nrow(result), max_check), "checked for locality; increase 'max_check' to ",
           "check them all.", call. = FALSE)
         check_rows <- seq_len(max_check)
@@ -355,7 +295,7 @@ funga_mycobank_gap <- function(taxon,
         n_brazil <- sum(result$MycoBank_Brazil_Evidence, na.rm = TRUE)
         if (verbose) {
           message(sprintf(
-            "  %d of %d checked candidate(s) have MycoBank locality evidence for Brazil.",
+            "  %d of %d checked name(s) have MycoBank locality evidence for Brazil.",
             n_brazil, length(check_rows)))
         }
         result <- result[which(result$MycoBank_Brazil_Evidence), ]
@@ -363,15 +303,14 @@ funga_mycobank_gap <- function(taxon,
     }
   } else if (!check_locality && require_brazil_evidence && verbose && nrow(result) > 0) {
     message("  'require_brazil_evidence = TRUE' requires 'check_locality = TRUE' to have ",
-           "MycoBank locality evidence to filter on; returning all species missing from ",
-           "FFB instead.")
+           "MycoBank locality evidence to filter on; returning all matching names instead.")
   }
 
   rownames(result) <- NULL
 
   if (verbose) {
-    message(sprintf("\n\u2713 %d candidate species found in MycoBank but missing from FFB",
-                    nrow(result)))
+    message(sprintf("\n\u2713 %d MycoBank record(s) retrieved for %s '%s'",
+                    nrow(result), rank, taxon))
   }
 
   if (save && nrow(result) > 0) {
@@ -390,8 +329,8 @@ funga_mycobank_gap <- function(taxon,
     family_gap <- as.data.frame(table(family_vec[!is.na(family_vec)]),
                                 stringsAsFactors = FALSE)
     if (nrow(family_gap) > 0) {
-      names(family_gap) <- c("family", "n_missing")
-      family_gap <- family_gap[order(-family_gap$n_missing), ]
+      names(family_gap) <- c("family", "n_records")
+      family_gap <- family_gap[order(-family_gap$n_records), ]
       rownames(family_gap) <- NULL
     }
 
@@ -402,16 +341,15 @@ funga_mycobank_gap <- function(taxon,
       taxon = taxon,
       rank = rank,
       n_mycobank = nrow(mb_sub),
-      n_in_ffb = length(ffb_names),
-      n_missing_any_locality = n_missing_any_locality,
-      n_missing = nrow(result),
+      n_any_locality = n_any_locality,
+      n_records = nrow(result),
       brazil_filtered = brazil_filtered,
       family_gap = family_gap,
       result = result
     )
 
     dir <- .arg_check_dir(dir)
-    .funga_render_report(template = "funga_mycobank_gap_report.Rmd",
+    .funga_render_report(template = "mycobank_records_report.Rmd",
                          data_list = report_data,
                          taxon = taxon,
                          dir = dir,

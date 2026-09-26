@@ -1,5 +1,5 @@
-# Unit tests for the internal helpers behind funga_mycobank_gap() and
-# funga_distribution_gap() (auxiliary_fxns.R): GBIF/speciesLink/MycoBank
+# Unit tests for the internal helpers behind mycobank_gap() and
+# distribution_gap() (auxiliary_fxns.R): GBIF/speciesLink/MycoBank
 # lookups and the shared HTML-report renderer. All external calls are mocked
 # so these tests run offline and do not depend on chromote/rmarkdown/DT
 # actually being usable in the test environment.
@@ -248,7 +248,7 @@ test_that(".funga_render_report skips gracefully when a reporting package is una
     .package = "base"
   )
   out_dir <- withr::local_tempdir()
-  ok <- .funga_render_report(template = "funga_mycobank_gap_report.Rmd",
+  ok <- .funga_render_report(template = "mycobank_gap_report.Rmd",
                              data_list = list(), taxon = "x", dir = out_dir,
                              filename = "report", verbose = FALSE, open_report = FALSE)
   expect_false(ok)

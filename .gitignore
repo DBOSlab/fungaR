@@ -6,14 +6,16 @@
 
 # Default cache/output directories created by fungaR's own functions when run
 # interactively from the package root (funga_download(), funga_records(),
-# funga_mycobank_gap(), funga_mycobank_records(), funga_distribution_gap()),
-# plus MycoBank's bulk export cache and refloraR's own download cache. These
-# are local scratch data, never package content.
+# mycobank_gap(), mycobank_records(), distribution_gap(), spfungorum_gap(),
+# spfungorum_records()), plus MycoBank's bulk export cache and refloraR's own
+# download cache. These are local scratch data, never package content.
 /funga_download/
 /funga_records/
-/funga_mycobank_gap/
-/funga_mycobank_records/
-/funga_distribution_gap/
+/mycobank_gap/
+/mycobank_records/
+/distribution_gap/
+/spfungorum_gap/
+/spfungorum_records/
 /mycobank_download/
 /reflora_download/
 

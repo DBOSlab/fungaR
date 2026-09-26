@@ -1,6 +1,22 @@
 # Auxiliary functions to support main functions
 # Author: Domingos Cardoso
 
+# The 26 Brazilian states plus the Federal District (name = full name,
+# value = 2-letter abbreviation). Shared by .arg_check_state() (state-argument
+# validation) and .location_mentions_brazil() (checking whether an external
+# repository's free-text locality names a Brazilian state without necessarily
+# naming the country itself, e.g. Index Fungorum's LOCATION field).
+.br_states <- c("Acre" = "AC", "Alagoas" = "AL", "Amap\u00e1" = "AP", "Amazonas" = "AM",
+                "Bahia" = "BA", "Cear\u00e1" = "CE", "Distrito Federal" = "DF",
+                "Esp\u00edrito Santo" = "ES", "Goi\u00e1s" = "GO", "Maranh\u00e3o" = "MA",
+                "Mato Grosso" = "MT", "Mato Grosso do Sul" = "MS", "Minas Gerais" = "MG",
+                "Par\u00e1" = "PA", "Para\u00edba" = "PB", "Paran\u00e1" = "PR", "Pernambuco" = "PE",
+                "Piau\u00ed" = "PI", "Rio de Janeiro" = "RJ", "Rio Grande do Norte" = "RN",
+                "Rio Grande do Sul" = "RS", "Rond\u00f4nia" = "RO", "Roraima" = "RR",
+                "Santa Catarina" = "SC", "S\u00e3o Paulo" = "SP", "Sergipe" = "SE",
+                "Tocantins" = "TO")
+
+
 #_______________________________________________________________________________
 # Function to filter occurrence data ####
 .filter_occur_df <- function(occur_df, taxon, state, verbose) {
@@ -123,7 +139,7 @@
 
 #_______________________________________________________________________________
 # Query GBIF's public occurrence API for Brazil-only evidence of a given
-# scientific name. Used by funga_mycobank_gap() and funga_distribution_gap()
+# scientific name. Used by mycobank_gap() and distribution_gap()
 # as the primary (reliable, no API key required) occurrence-evidence source.
 # Returns a list(n_records, states) and never errors -- any network/parsing
 # failure is caught and reported as NA so a single bad lookup never aborts a
@@ -159,7 +175,7 @@
 #_______________________________________________________________________________
 # Fetch individual (record-level, not aggregated) GBIF occurrence records for a
 # given scientific name within one Brazilian state, each with a direct link to
-# the record's own GBIF occurrence page. Used by funga_distribution_gap() to
+# the record's own GBIF occurrence page. Used by distribution_gap() to
 # list the actual specimen/observation records backing a new-state-record
 # candidate, not just the state-level count. Never errors - any failure
 # returns a zero-row data frame with the expected columns. ####
@@ -229,14 +245,15 @@
 # substrate/host, and several other fields only available on the individual
 # page (not in MycoBank's bulk export): etymology, name type (e.g. Basionym/
 # Combination), the type specimen voucher itself, the collector, and the
-# original-publication (protolog) citation. Used by funga_mycobank_gap() and
-# funga_mycobank_records() to check whether MycoBank itself already
+# original-publication (protolog) citation. Used by mycobank_gap() and
+# mycobank_records() to check whether MycoBank itself already
 # associates a candidate name with a Brazilian locality, and to enrich the
 # returned spreadsheet beyond what the bulk export alone provides. Never
 # errors - any navigation or parsing failure is caught and every field
 # reported as NA, matching the package's defensive pattern for other
 # external lookups. ####
-.mycobank_page_details <- function(session, url, taxon_name = NULL, max_wait = 20) {
+.mycobank_page_details <- function(session, url, taxon_name = NULL, max_wait = 20,
+                                   retries = 1) {
   # A data-driven marker guaranteed to appear in document.body.innerText only
   # once the record's own async data has actually rendered: the requested
   # taxon name itself when known (most precise - passed by the caller, which
@@ -250,17 +267,36 @@
   # locality" results even for names MycoBank does report a locality for.
   marker <- if (!is.null(taxon_name) && nzchar(taxon_name)) taxon_name else "MycoBank #"
 
-  txt <- tryCatch({
+  one_attempt <- function() {
     session$Page$navigate(url)
     session$Page$loadEventFired(wait_ = TRUE, timeout_ = 20)
 
     deadline <- Sys.time() + max_wait
     val <- NULL
+    found <- FALSE
     repeat {
       val <- session$Runtime$evaluate("document.body.innerText")$result$value
-      if (!is.null(val) && !is.na(val) && grepl(marker, val, fixed = TRUE)) break
+      if (!is.null(val) && !is.na(val) && grepl(marker, val, fixed = TRUE)) {
+        found <- TRUE
+        break
+      }
       if (Sys.time() >= deadline) break
       Sys.sleep(0.5)
+    }
+    list(val = val, found = found)
+  }
+
+  txt <- tryCatch({
+    val <- NULL
+    for (attempt in seq_len(retries + 1)) {
+      res <- one_attempt()
+      val <- res$val
+      # A network/render hiccup that never produces the marker within
+      # max_wait is retried once (a fresh navigation, not just re-polling the
+      # same failed load) rather than immediately accepted as "no locality" -
+      # this scrape is occasionally flaky under real network conditions even
+      # for records confirmed (by hand) to have the data we're looking for.
+      if (res$found || attempt > retries) break
     }
     val
   }, error = function(e) NA_character_)
@@ -300,10 +336,97 @@
 
 
 #_______________________________________________________________________________
+# Whether a free-text locality string mentions Brazil - either the country
+# name itself, or (Index Fungorum's LOCATION field very often gives a
+# Brazilian state/province name directly, e.g. "Pernambuco", without ever
+# naming the country) any of the 26 Brazilian states plus the Federal
+# District. Diacritics are stripped on both sides so e.g. "Sao Paulo" or
+# "Ceara" (without accents) still match. ####
+.location_mentions_brazil <- function(location) {
+  if (is.null(location) || is.na(location) || !nzchar(location)) return(FALSE)
+
+  loc_ascii <- stringi::stri_trans_general(location, "Latin-ASCII")
+  if (grepl("brazil|brasil", loc_ascii, ignore.case = TRUE)) return(TRUE)
+
+  states_ascii <- stringi::stri_trans_general(names(.br_states), "Latin-ASCII")
+  any(vapply(states_ascii, function(st) grepl(st, loc_ascii, ignore.case = TRUE),
+            logical(1)))
+}
+
+
+#_______________________________________________________________________________
+# Query Index Fungorum's own web service (a plain HTTP GET/XML API, not SOAP -
+# https://www.indexfungorum.org/ixfwebservice/fungus.asmx) for every name
+# matching a species, genus, or order, and return it as a data.frame. Unlike
+# MycoBank, this needs no bulk-export download or per-record page visit (and
+# no headless browser): a single request returns every matching name,
+# including - for many records - the type specimen's own reported LOCATION
+# and HOST, which is what spfungorum_gap()/spfungorum_records() use as
+# their Brazil-evidence signal. Never errors - a request failure returns an
+# empty (but correctly shaped) data.frame, matching the package's defensive
+# pattern for other external lookups. ####
+.indexfungorum_name_search <- function(taxon, rank = c("species", "genus"),
+                                       max_number = 1000) {
+  rank <- match.arg(rank)
+
+  empty <- data.frame(Taxon_name = character(0), Authors = character(0),
+                      Year = character(0), Rank = character(0),
+                      Name_status = character(0), Current_name = character(0),
+                      Location = character(0), Host = character(0),
+                      Fungorum_Number = character(0), stringsAsFactors = FALSE)
+
+  doc <- tryCatch({
+    url <- sprintf(
+      "https://www.indexfungorum.org/ixfwebservice/fungus.asmx/NameSearch?SearchText=%s&AnywhereInText=false&MaxNumber=%d",
+      utils::URLencode(taxon, reserved = TRUE), max_number)
+    xml2::read_xml(url)
+  }, error = function(e) NULL)
+
+  if (is.null(doc)) return(empty)
+
+  nodes <- xml2::xml_find_all(doc, ".//IndexFungorum")
+  if (length(nodes) == 0) return(empty)
+
+  get_field <- function(node, field) {
+    val <- xml2::xml_text(xml2::xml_find_first(node, field))
+    if (is.na(val) || !nzchar(val)) return(NA_character_)
+    # Index Fungorum's XML stores HTML markup (e.g. "<i>...</i>" around a
+    # species epithet within HOST) as literal escaped text, not real child
+    # elements, so xml_text() alone does not strip it - remove it here.
+    val <- trimws(gsub("<[^>]+>", "", val))
+    if (!nzchar(val)) NA_character_ else val
+  }
+
+  result <- do.call(rbind, lapply(nodes, function(node) {
+    data.frame(
+      Taxon_name = get_field(node, "NAME_x0020_OF_x0020_FUNGUS"),
+      Authors = get_field(node, "AUTHORS"),
+      Year = get_field(node, "YEAR_x0020_OF_x0020_PUBLICATION"),
+      Rank = get_field(node, "INFRASPECIFIC_x0020_RANK"),
+      Name_status = get_field(node, "NAME_x0020_STATUS"),
+      Current_name = get_field(node, "CURRENT_x0020_NAME"),
+      Location = get_field(node, "LOCATION"),
+      Host = get_field(node, "HOST"),
+      Fungorum_Number = get_field(node, "RECORD_x0020_NUMBER"),
+      stringsAsFactors = FALSE
+    )
+  }))
+  rownames(result) <- NULL
+
+  # Keep species-level names only - for a genus-rank search this also drops
+  # the genus's own entry (Rank == "gen.") that "from the start" matching
+  # otherwise includes alongside its species.
+  result <- result[result$Rank %in% "sp." & !is.na(result$Taxon_name), ]
+  rownames(result) <- NULL
+  result
+}
+
+
+#_______________________________________________________________________________
 # Render one of the funga_*_gap() HTML reports (inst/rmd/<template>) from a
 # pre-computed data list, mirroring the jabotR HTML-report pattern: KPI boxes
-# plus filterable/downloadable DT tables. Used by funga_mycobank_gap() and
-# funga_distribution_gap(). Degrades gracefully (message + skip) if the
+# plus filterable/downloadable DT tables. Used by mycobank_gap() and
+# distribution_gap(). Degrades gracefully (message + skip) if the
 # reporting packages or the template are unavailable, so a missing Suggests
 # dependency never breaks the underlying analysis. ####
 .funga_render_report <- function(template, data_list, taxon, dir, filename,

@@ -18,7 +18,7 @@ Description: The 'fungaR' package provides a comprehensive interface to the
     including fungi-specific traits such as nutritional mode, host/substrate, and lichenization status.
     Beyond data retrieval, 'fungaR' also assists taxonomic experts contributing to the FFB
     by simplifying the integration of new fungal species names and records from global mycological
-    repositories such as MycoBank, speciesLink, and GBIF.
+    repositories such as MycoBank, Index Fungorum, speciesLink, and GBIF.
     The package is designed to streamline both data exploration and data curation workflows,
     integrating seamlessly with the 'tidyverse' for downstream analyses and reproducible
     research pipelines.
@@ -39,7 +39,8 @@ Imports:
     rlang,
     jsonlite,
     openxlsx,
-    readxl
+    readxl,
+    xml2
 Suggests:
     testthat (>= 3.0.0),
     withr,

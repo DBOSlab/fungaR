@@ -51,10 +51,10 @@
 }
 
 
-test_that("funga_mycobank_records retrieves all matching species-level names for a genus", {
+test_that("mycobank_records retrieves all matching species-level names for a genus", {
   mb_dir <- .mycobank_records_mock_dir()
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = FALSE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -63,10 +63,10 @@ test_that("funga_mycobank_records retrieves all matching species-level names for
 })
 
 
-test_that("funga_mycobank_records excludes non-species ranks (e.g. the genus entry itself)", {
+test_that("mycobank_records excludes non-species ranks (e.g. the genus entry itself)", {
   mb_dir <- .mycobank_records_mock_dir()
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = FALSE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -74,10 +74,10 @@ test_that("funga_mycobank_records excludes non-species ranks (e.g. the genus ent
 })
 
 
-test_that("funga_mycobank_records retrieves a single exact species match", {
+test_that("mycobank_records retrieves a single exact species match", {
   mb_dir <- .mycobank_records_mock_dir()
 
-  result <- funga_mycobank_records(taxon = "Trichoderma harzianum", rank = "species",
+  result <- mycobank_records(taxon = "Trichoderma harzianum", rank = "species",
                                    check_locality = FALSE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -86,10 +86,10 @@ test_that("funga_mycobank_records retrieves a single exact species match", {
 })
 
 
-test_that("funga_mycobank_records returns an empty data.frame (not an error) with no matches", {
+test_that("mycobank_records returns an empty data.frame (not an error) with no matches", {
   mb_dir <- .mycobank_records_mock_dir()
 
-  result <- funga_mycobank_records(taxon = "Nonexistentus fakus", rank = "species",
+  result <- mycobank_records(taxon = "Nonexistentus fakus", rank = "species",
                                    check_locality = FALSE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -97,13 +97,13 @@ test_that("funga_mycobank_records returns an empty data.frame (not an error) wit
 })
 
 
-test_that("funga_mycobank_records filters to only Brazil-evidence records by default", {
+test_that("mycobank_records filters to only Brazil-evidence records by default", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_records_mock_dir()
   .mock_mycobank_records_locality_session(brazil_mb_numbers = "101")
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = TRUE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -113,13 +113,13 @@ test_that("funga_mycobank_records filters to only Brazil-evidence records by def
 })
 
 
-test_that("funga_mycobank_records returns an empty data.frame (not an error) when no candidate has Brazil evidence", {
+test_that("mycobank_records returns an empty data.frame (not an error) when no candidate has Brazil evidence", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_records_mock_dir()
   .mock_mycobank_records_locality_session(brazil_mb_numbers = character(0))
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = TRUE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -127,13 +127,13 @@ test_that("funga_mycobank_records returns an empty data.frame (not an error) whe
 })
 
 
-test_that("funga_mycobank_records returns unfiltered records when require_brazil_evidence = FALSE", {
+test_that("mycobank_records returns unfiltered records when require_brazil_evidence = FALSE", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_records_mock_dir()
   .mock_mycobank_records_locality_session(brazil_mb_numbers = "101")
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = TRUE, require_brazil_evidence = FALSE,
                                    save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
@@ -143,10 +143,10 @@ test_that("funga_mycobank_records returns unfiltered records when require_brazil
 })
 
 
-test_that("funga_mycobank_records ignores require_brazil_evidence when check_locality = FALSE", {
+test_that("mycobank_records ignores require_brazil_evidence when check_locality = FALSE", {
   mb_dir <- .mycobank_records_mock_dir()
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = FALSE, require_brazil_evidence = TRUE,
                                    save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
@@ -155,13 +155,13 @@ test_that("funga_mycobank_records ignores require_brazil_evidence when check_loc
 })
 
 
-test_that("funga_mycobank_records requires a single character taxon", {
-  expect_error(funga_mycobank_records(taxon = NULL), "single character string")
-  expect_error(funga_mycobank_records(taxon = c("A", "B")), "single character string")
+test_that("mycobank_records requires a single character taxon", {
+  expect_error(mycobank_records(taxon = NULL), "single character string")
+  expect_error(mycobank_records(taxon = c("A", "B")), "single character string")
 })
 
 
-test_that("funga_mycobank_records warns and caps checks at max_check", {
+test_that("mycobank_records warns and caps checks at max_check", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_records_mock_dir()
@@ -184,7 +184,7 @@ test_that("funga_mycobank_records warns and caps checks at max_check", {
   )
 
   expect_warning(
-    result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+    result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                      check_locality = TRUE, require_brazil_evidence = FALSE,
                                      max_check = 2, save = FALSE, html_report = FALSE,
                                      mycobank_dir = mb_dir, verbose = FALSE),
@@ -195,7 +195,7 @@ test_that("funga_mycobank_records warns and caps checks at max_check", {
 })
 
 
-test_that("funga_mycobank_records skips the locality check gracefully without chromote", {
+test_that("mycobank_records skips the locality check gracefully without chromote", {
   mb_dir <- .mycobank_records_mock_dir()
 
   testthat::local_mocked_bindings(
@@ -203,7 +203,7 @@ test_that("funga_mycobank_records skips the locality check gracefully without ch
     .package = "base"
   )
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = TRUE, save = FALSE, html_report = FALSE,
                                    mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -212,11 +212,11 @@ test_that("funga_mycobank_records skips the locality check gracefully without ch
 })
 
 
-test_that("funga_mycobank_records writes a real .xlsx file when save = TRUE", {
+test_that("mycobank_records writes a real .xlsx file when save = TRUE", {
   mb_dir <- .mycobank_records_mock_dir()
   out_dir <- withr::local_tempdir()
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = FALSE, save = TRUE, html_report = FALSE,
                                    mycobank_dir = mb_dir, dir = out_dir,
                                    filename = "mb_records", verbose = FALSE)
@@ -226,7 +226,7 @@ test_that("funga_mycobank_records writes a real .xlsx file when save = TRUE", {
 })
 
 
-test_that("funga_mycobank_records renders a real HTML report when html_report = TRUE", {
+test_that("mycobank_records renders a real HTML report when html_report = TRUE", {
   skip_if_not_installed("rmarkdown")
   skip_if_not_installed("DT")
   skip_if_not_installed("htmltools")
@@ -235,7 +235,7 @@ test_that("funga_mycobank_records renders a real HTML report when html_report = 
   mb_dir <- .mycobank_records_mock_dir()
   out_dir <- withr::local_tempdir()
 
-  result <- funga_mycobank_records(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_records(taxon = "Trichoderma", rank = "genus",
                                    check_locality = FALSE, save = FALSE, html_report = TRUE,
                                    open_report = FALSE, mycobank_dir = mb_dir,
                                    dir = out_dir, filename = "report_test", verbose = FALSE)
@@ -244,7 +244,7 @@ test_that("funga_mycobank_records renders a real HTML report when html_report = 
 })
 
 
-test_that("funga_mycobank_records reuses a previously downloaded MycoBank list", {
+test_that("mycobank_records reuses a previously downloaded MycoBank list", {
   mb_dir <- .mycobank_records_mock_dir()
 
   testthat::local_mocked_bindings(
@@ -253,7 +253,7 @@ test_that("funga_mycobank_records reuses a previously downloaded MycoBank list",
   )
 
   expect_no_error(
-    funga_mycobank_records(taxon = "Trichoderma", rank = "genus", check_locality = FALSE,
+    mycobank_records(taxon = "Trichoderma", rank = "genus", check_locality = FALSE,
                            save = FALSE, html_report = FALSE, mycobank_dir = mb_dir,
                            verbose = FALSE)
   )

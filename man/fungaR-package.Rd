@@ -28,14 +28,14 @@ provide a complete workflow for accessing and analyzing Brazilian fungal
 diversity data.
 
 fungaR also provides three functions dedicated to fungal-specific curation
-work: \code{\link{funga_mycobank_gap}}, which cross-checks a given genus or
+work: \code{\link{mycobank_gap}}, which cross-checks a given genus or
 order against MycoBank's global name database and its own locality
 evidence to flag fungal species MycoBank places in Brazil but that are
-still missing from FFB; \code{\link{funga_mycobank_records}}, which
+still missing from FFB; \code{\link{mycobank_records}}, which
 retrieves every available MycoBank name for a given species, genus, or
 order, filtered by default to those with MycoBank Brazil evidence,
 regardless of whether they are already registered in FFB; and
-\code{\link{funga_distribution_gap}}, which checks speciesLink and the
+\code{\link{distribution_gap}}, which checks speciesLink and the
 Reflora Virtual Herbarium for specimen evidence of a taxon in Brazilian
 states not yet listed in its official FFB distribution.
 

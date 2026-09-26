@@ -33,11 +33,11 @@
 }
 
 
-test_that("funga_mycobank_gap flags MycoBank species missing from FFB", {
+test_that("mycobank_gap flags MycoBank species missing from FFB", {
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -46,12 +46,12 @@ test_that("funga_mycobank_gap flags MycoBank species missing from FFB", {
 })
 
 
-test_that("funga_mycobank_gap excludes MycoBank synonyms whose accepted name is already in FFB", {
+test_that("mycobank_gap excludes MycoBank synonyms whose accepted name is already in FFB", {
   mb_dir <- .mycobank_mock_dir()
   # "Trichoderma oldsynonym"'s Current name is "Trichoderma harzianum", already in FFB
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -59,7 +59,7 @@ test_that("funga_mycobank_gap excludes MycoBank synonyms whose accepted name is 
 })
 
 
-test_that("funga_mycobank_gap does not flag a name as missing when its raw MycoBank name matches FFB even if MycoBank's Current name points to a different genus", {
+test_that("mycobank_gap does not flag a name as missing when its raw MycoBank name matches FFB even if MycoBank's Current name points to a different genus", {
   # Regression test: MycoBank and FFB can disagree on which genus a name
   # currently belongs to (e.g. MycoBank treats "Phellinotus neoaridus" as a
   # synonym of "Fomitiporella neoarida", while FFB accepts it in Phellinotus).
@@ -87,7 +87,7 @@ test_that("funga_mycobank_gap does not flag a name as missing when its raw MycoB
 
   .mock_funga_mycobank_ffb(c("Phellinotus neoaridus"))
 
-  result <- funga_mycobank_gap(taxon = "Phellinotus", rank = "genus",
+  result <- mycobank_gap(taxon = "Phellinotus", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = FALSE,
                                mycobank_dir = dir, verbose = FALSE)
 
@@ -96,7 +96,7 @@ test_that("funga_mycobank_gap does not flag a name as missing when its raw MycoB
 })
 
 
-test_that("funga_mycobank_gap returns an empty data.frame (not an error) when every MycoBank candidate is already in FFB", {
+test_that("mycobank_gap returns an empty data.frame (not an error) when every MycoBank candidate is already in FFB", {
   # Regression test: when every MycoBank species-level name for the genus/order
   # is already in FFB, 'missing' has 0 rows. Building the final result data.frame
   # used to include 'In_FFB = FALSE' as a bare length-1 scalar, which errors
@@ -106,7 +106,7 @@ test_that("funga_mycobank_gap returns an empty data.frame (not an error) when ev
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum", "Trichoderma viride",
                              "Trichoderma newspeciesii"))
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -115,11 +115,11 @@ test_that("funga_mycobank_gap returns an empty data.frame (not an error) when ev
 })
 
 
-test_that("funga_mycobank_gap excludes non-species ranks (e.g. the genus entry itself)", {
+test_that("mycobank_gap excludes non-species ranks (e.g. the genus entry itself)", {
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(character(0))
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -127,14 +127,14 @@ test_that("funga_mycobank_gap excludes non-species ranks (e.g. the genus entry i
 })
 
 
-test_that("funga_mycobank_gap treats an unmatched FFB taxon as an empty known-species set", {
+test_that("mycobank_gap treats an unmatched FFB taxon as an empty known-species set", {
   mb_dir <- .mycobank_mock_dir()
   testthat::local_mocked_bindings(
     funga_get_children_taxa = function(...) stop("Taxon 'Trichoderma' with rank 'genus' not found in FFB database."),
     .package = "fungaR"
   )
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -172,14 +172,14 @@ test_that("funga_mycobank_gap treats an unmatched FFB taxon as an empty known-sp
 }
 
 
-test_that("funga_mycobank_gap flags MycoBank_Brazil_Evidence from each name's own locality", {
+test_that("mycobank_gap flags MycoBank_Brazil_Evidence from each name's own locality", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
   .mock_mycobank_locality_session()
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = TRUE, require_brazil_evidence = FALSE,
                                save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
@@ -194,14 +194,14 @@ test_that("funga_mycobank_gap flags MycoBank_Brazil_Evidence from each name's ow
 })
 
 
-test_that("funga_mycobank_gap filters to only Brazil-evidence candidates by default", {
+test_that("mycobank_gap filters to only Brazil-evidence candidates by default", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
   .mock_mycobank_locality_session()
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = TRUE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
@@ -214,11 +214,11 @@ test_that("funga_mycobank_gap filters to only Brazil-evidence candidates by defa
 })
 
 
-test_that("funga_mycobank_gap ignores require_brazil_evidence when check_locality = FALSE", {
+test_that("mycobank_gap ignores require_brazil_evidence when check_locality = FALSE", {
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, require_brazil_evidence = TRUE,
                                save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
@@ -227,13 +227,13 @@ test_that("funga_mycobank_gap ignores require_brazil_evidence when check_localit
 })
 
 
-test_that("funga_mycobank_gap requires a single character taxon", {
-  expect_error(funga_mycobank_gap(taxon = NULL), "single character string")
-  expect_error(funga_mycobank_gap(taxon = c("A", "B")), "single character string")
+test_that("mycobank_gap requires a single character taxon", {
+  expect_error(mycobank_gap(taxon = NULL), "single character string")
+  expect_error(mycobank_gap(taxon = c("A", "B")), "single character string")
 })
 
 
-test_that("funga_mycobank_gap renders a real HTML report when html_report = TRUE", {
+test_that("mycobank_gap renders a real HTML report when html_report = TRUE", {
   skip_if_not_installed("rmarkdown")
   skip_if_not_installed("DT")
   skip_if_not_installed("htmltools")
@@ -244,7 +244,7 @@ test_that("funga_mycobank_gap renders a real HTML report when html_report = TRUE
 
   out_dir <- withr::local_tempdir()
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = FALSE, html_report = TRUE,
                                open_report = FALSE, mycobank_dir = mb_dir,
                                dir = out_dir, filename = "report_test", verbose = FALSE)
@@ -253,7 +253,7 @@ test_that("funga_mycobank_gap renders a real HTML report when html_report = TRUE
 })
 
 
-test_that("funga_mycobank_gap reuses a previously downloaded MycoBank list", {
+test_that("mycobank_gap reuses a previously downloaded MycoBank list", {
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(character(0))
 
@@ -263,18 +263,18 @@ test_that("funga_mycobank_gap reuses a previously downloaded MycoBank list", {
   )
 
   expect_no_error(
-    funga_mycobank_gap(taxon = "Trichoderma", rank = "genus", check_locality = FALSE,
+    mycobank_gap(taxon = "Trichoderma", rank = "genus", check_locality = FALSE,
                        save = FALSE, html_report = FALSE, mycobank_dir = mb_dir, verbose = FALSE)
   )
 })
 
 
-test_that("funga_mycobank_gap writes a real .xlsx file when save = TRUE", {
+test_that("mycobank_gap writes a real .xlsx file when save = TRUE", {
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
   out_dir <- withr::local_tempdir()
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE, save = TRUE, html_report = FALSE,
                                mycobank_dir = mb_dir, dir = out_dir,
                                filename = "mb_gap", verbose = FALSE)
@@ -284,7 +284,7 @@ test_that("funga_mycobank_gap writes a real .xlsx file when save = TRUE", {
 })
 
 
-test_that("funga_mycobank_gap warns and caps checks at max_check", {
+test_that("mycobank_gap warns and caps checks at max_check", {
   skip_if_not_installed("chromote")
 
   mb_dir <- .mycobank_mock_dir()
@@ -308,7 +308,7 @@ test_that("funga_mycobank_gap warns and caps checks at max_check", {
   )
 
   expect_warning(
-    result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+    result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                  check_locality = TRUE, require_brazil_evidence = FALSE,
                                  max_check = 2, save = FALSE, html_report = FALSE,
                                  mycobank_dir = mb_dir, verbose = FALSE),
@@ -319,7 +319,7 @@ test_that("funga_mycobank_gap warns and caps checks at max_check", {
 })
 
 
-test_that("funga_mycobank_gap skips the locality check gracefully without chromote", {
+test_that("mycobank_gap skips the locality check gracefully without chromote", {
   mb_dir <- .mycobank_mock_dir()
   .mock_funga_mycobank_ffb(c("Trichoderma harzianum"))
 
@@ -328,7 +328,7 @@ test_that("funga_mycobank_gap skips the locality check gracefully without chromo
     .package = "base"
   )
 
-  result <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+  result <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = TRUE, save = FALSE, html_report = FALSE,
                                mycobank_dir = mb_dir, verbose = FALSE)
 
