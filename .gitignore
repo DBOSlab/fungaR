@@ -3,3 +3,20 @@
 .RData
 .Ruserdata
 .DS_Store
+
+# Default cache/output directories created by fungaR's own functions when run
+# interactively from the package root (funga_download(), funga_records(),
+# funga_mycobank_gap(), funga_mycobank_records(), funga_distribution_gap()),
+# plus MycoBank's bulk export cache and refloraR's own download cache. These
+# are local scratch data, never package content.
+/funga_download/
+/funga_records/
+/funga_mycobank_gap/
+/funga_mycobank_records/
+/funga_distribution_gap/
+/mycobank_download/
+/reflora_download/
+
+# testthat auto-saves the source of failing tests here for debugging; local
+# debug clutter, never package content.
+tests/testthat/_problems/

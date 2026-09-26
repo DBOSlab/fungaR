@@ -8,3 +8,14 @@
 ^\.github$
 ^codecov\.yml$
 ^cran-comments\.md$
+
+# Default cache/output directories created by fungaR's own functions when run
+# interactively from the package root (see .gitignore for the full list) -
+# local scratch data that must never be bundled into the built package.
+^funga_download$
+^funga_records$
+^funga_mycobank_gap$
+^funga_mycobank_records$
+^funga_distribution_gap$
+^mycobank_download$
+^reflora_download$

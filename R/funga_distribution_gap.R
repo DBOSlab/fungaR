@@ -86,7 +86,8 @@
 #'     candidate worth manual taxonomic review.}
 #' }
 #'
-#' @seealso \code{\link{funga_mycobank_gap}}, \code{\link{funga_records}}
+#' @seealso \code{\link{funga_mycobank_gap}}, \code{\link{funga_mycobank_records}},
+#'   \code{\link{funga_records}}
 #'
 #' @author
 #' Domingos Cardoso

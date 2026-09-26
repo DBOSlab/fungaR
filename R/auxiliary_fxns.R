@@ -225,35 +225,77 @@
 #_______________________________________________________________________________
 # Visit one MycoBank name page (a JavaScript single-page app with no static
 # HTML fallback - a plain HTTP GET only returns an empty Angular shell) via an
-# already-open chromote session, and extract the type specimen's "Location
-# details" and "Substrate details"/Host as reported on that page. Used by
-# funga_mycobank_gap() to check whether MycoBank itself already associates a
-# candidate name with a Brazilian locality. Never errors - any navigation or
-# parsing failure is caught and reported as NA, matching the package's
-# defensive pattern for other external lookups. ####
-.mycobank_page_locality <- function(session, url) {
+# already-open chromote session, and extract the type specimen's locality,
+# substrate/host, and several other fields only available on the individual
+# page (not in MycoBank's bulk export): etymology, name type (e.g. Basionym/
+# Combination), the type specimen voucher itself, the collector, and the
+# original-publication (protolog) citation. Used by funga_mycobank_gap() and
+# funga_mycobank_records() to check whether MycoBank itself already
+# associates a candidate name with a Brazilian locality, and to enrich the
+# returned spreadsheet beyond what the bulk export alone provides. Never
+# errors - any navigation or parsing failure is caught and every field
+# reported as NA, matching the package's defensive pattern for other
+# external lookups. ####
+.mycobank_page_details <- function(session, url, taxon_name = NULL, max_wait = 20) {
+  # A data-driven marker guaranteed to appear in document.body.innerText only
+  # once the record's own async data has actually rendered: the requested
+  # taxon name itself when known (most precise - passed by the caller, which
+  # already knows which name it expects), else the "MycoBank #" data label
+  # that is present on every rendered name page regardless of whether that
+  # particular record has locality data. Polling document.title for a change
+  # away from the generic app-shell title was tried first but proved
+  # unreliable: title and the specimen/locality section can be populated by
+  # separate async fetches, so title sometimes updates before the content we
+  # actually need to scrape has rendered - causing intermittent false "no
+  # locality" results even for names MycoBank does report a locality for.
+  marker <- if (!is.null(taxon_name) && nzchar(taxon_name)) taxon_name else "MycoBank #"
+
   txt <- tryCatch({
     session$Page$navigate(url)
     session$Page$loadEventFired(wait_ = TRUE, timeout_ = 20)
-    Sys.sleep(1.2)  # let Angular finish rendering the post-load data fetch
-    res <- session$Runtime$evaluate("document.body.innerText")
-    res$result$value
+
+    deadline <- Sys.time() + max_wait
+    val <- NULL
+    repeat {
+      val <- session$Runtime$evaluate("document.body.innerText")$result$value
+      if (!is.null(val) && !is.na(val) && grepl(marker, val, fixed = TRUE)) break
+      if (Sys.time() >= deadline) break
+      Sys.sleep(0.5)
+    }
+    val
   }, error = function(e) NA_character_)
 
+  empty <- list(locality = NA_character_, substrate = NA_character_,
+               etymology = NA_character_, name_type = NA_character_,
+               type_specimen = NA_character_, collector = NA_character_,
+               protolog = NA_character_)
+
   if (is.na(txt) || !nzchar(txt)) {
-    return(list(locality = NA_character_, substrate = NA_character_))
+    return(empty)
   }
 
   lines <- strsplit(txt, "\n")[[1]]
-  next_line_after <- function(label) {
-    idx <- which(lines == label)
+  # Matches the first occurrence of `label` - the quick-summary "Type
+  # information" box near the top of the page always lists each of these as
+  # its own line followed immediately by the value on the next line, which is
+  # simpler and more reliable than the later "Specimen details" table further
+  # down the page (a tab-separated table repeating some of the same fields).
+  next_line_after <- function(label, fixed = TRUE) {
+    idx <- if (fixed) which(lines == label) else grep(label, lines)
     if (length(idx) == 0 || idx[1] >= length(lines)) return(NA_character_)
     val <- trimws(lines[idx[1] + 1])
     if (!nzchar(val)) NA_character_ else val
   }
 
   list(locality = next_line_after("Location details"),
-      substrate = next_line_after("Substrate details"))
+      substrate = next_line_after("Substrate details"),
+      etymology = next_line_after("Etymology"),
+      name_type = next_line_after("Name type"),
+      # The parenthetical status (holotype/isotype/lectotype/...) varies per
+      # record, so match the fixed label prefix rather than an exact line.
+      type_specimen = next_line_after("^Type specimen or ex type", fixed = FALSE),
+      collector = next_line_after("Collection details"),
+      protolog = next_line_after("Protolog"))
 }
 
 

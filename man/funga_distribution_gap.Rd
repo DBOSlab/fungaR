@@ -103,7 +103,8 @@ gap_ba_pe <- funga_distribution_gap(taxon = "Trichoderma harzianum",
 
 }
 \seealso{
-\code{\link{funga_mycobank_gap}}, \code{\link{funga_records}}
+\code{\link{funga_mycobank_gap}}, \code{\link{funga_mycobank_records}},
+  \code{\link{funga_records}}
 }
 \author{
 Domingos Cardoso

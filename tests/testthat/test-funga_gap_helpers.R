@@ -119,45 +119,126 @@ test_that(".splink_brazil_occurrence parses a features-shaped response and degra
 })
 
 
-test_that(".mycobank_page_locality extracts the line following each label", {
-  fake_text <- "Type information\nLocation details\nBrazil, Bahia\nSubstrate details\non dead wood\nOther stuff"
+.mycobank_fake_page_text <- function(locality = "Brazil, Bahia", substrate = "on dead wood") {
+  paste0(
+    "Type information\n",
+    "Type specimen or ex type (holotype)\nURM 80362 holotype\n",
+    "Location details\n", locality, "\n",
+    "Substrate details\n", substrate, "\n",
+    "Collection details\nDrechsler-Santos\n",
+    "General information\n",
+    "MycoBank #\n805901\n",
+    "Etymology\nneoaridus, in reference to the semiarid region\n",
+    "Name type\nBasionym\n",
+    "Bibliography\n",
+    "Protolog\nDrechsler-Santos et al. 2016. Phytotaxa 261(3):218-239\n"
+  )
+}
+
+test_that(".mycobank_page_details extracts every field from its own label", {
   fake_session <- list(
     Page = list(
       navigate = function(...) invisible(NULL),
       loadEventFired = function(...) invisible(NULL)
     ),
     Runtime = list(
-      evaluate = function(...) list(result = list(value = fake_text))
+      evaluate = function(...) list(result = list(value = .mycobank_fake_page_text()))
     )
   )
 
-  loc <- .mycobank_page_locality(fake_session, "https://www.mycobank.org/page/Name%20details%20page/1")
-  expect_equal(loc$locality, "Brazil, Bahia")
-  expect_equal(loc$substrate, "on dead wood")
+  det <- .mycobank_page_details(fake_session, "https://www.mycobank.org/page/Name%20details%20page/1")
+  expect_equal(det$locality, "Brazil, Bahia")
+  expect_equal(det$substrate, "on dead wood")
+  expect_equal(det$etymology, "neoaridus, in reference to the semiarid region")
+  expect_equal(det$name_type, "Basionym")
+  expect_equal(det$type_specimen, "URM 80362 holotype")
+  expect_equal(det$collector, "Drechsler-Santos")
+  expect_equal(det$protolog, "Drechsler-Santos et al. 2016. Phytotaxa 261(3):218-239")
 })
 
 
-test_that(".mycobank_page_locality returns NA locality/substrate when labels are absent", {
+test_that(".mycobank_page_details returns NA for every field when labels are absent", {
   fake_session <- list(
     Page = list(navigate = function(...) invisible(NULL),
                loadEventFired = function(...) invisible(NULL)),
-    Runtime = list(evaluate = function(...) list(result = list(value = "Nothing useful here")))
+    Runtime = list(evaluate = function(...) list(result = list(value = "MycoBank #\n1\nNothing useful here")))
   )
-  loc <- .mycobank_page_locality(fake_session, "https://example.com")
-  expect_true(is.na(loc$locality))
-  expect_true(is.na(loc$substrate))
+  det <- .mycobank_page_details(fake_session, "https://example.com")
+  expect_true(is.na(det$locality))
+  expect_true(is.na(det$substrate))
+  expect_true(is.na(det$etymology))
+  expect_true(is.na(det$name_type))
+  expect_true(is.na(det$type_specimen))
+  expect_true(is.na(det$collector))
+  expect_true(is.na(det$protolog))
 })
 
 
-test_that(".mycobank_page_locality degrades gracefully when navigation errors", {
+test_that(".mycobank_page_details degrades gracefully when navigation errors", {
   fake_session <- list(
     Page = list(navigate = function(...) stop("no such page"),
                loadEventFired = function(...) invisible(NULL)),
     Runtime = list(evaluate = function(...) stop("unreachable"))
   )
-  loc <- .mycobank_page_locality(fake_session, "https://example.com")
-  expect_true(is.na(loc$locality))
-  expect_true(is.na(loc$substrate))
+  det <- .mycobank_page_details(fake_session, "https://example.com")
+  expect_true(is.na(det$locality))
+  expect_true(is.na(det$substrate))
+  expect_true(is.na(det$type_specimen))
+})
+
+
+test_that(".mycobank_page_details polls until the requested taxon name actually appears in the rendered page", {
+  # Regression test: MycoBank's name pages are an Angular SPA whose
+  # loadEventFired fires before the record's own async data has rendered. An
+  # earlier fix polled document.title for a change away from the generic
+  # shell title, but title and the specimen/locality section can be
+  # populated by separate async fetches - title sometimes updates before the
+  # content we need has rendered, causing intermittent false "no locality"
+  # results even for names MycoBank does report a locality for. Polling
+  # document.body.innerText for the requested taxon name itself (passed by
+  # the caller) is more precise: it only matches once that data-driven
+  # content has actually rendered.
+  n_checks <- 0
+  fake_session <- list(
+    Page = list(navigate = function(...) invisible(NULL),
+               loadEventFired = function(...) invisible(NULL)),
+    Runtime = list(
+      evaluate = function(js) {
+        n_checks <<- n_checks + 1
+        # Generic app shell for the first two polls, then the record has "loaded"
+        val <- if (n_checks < 3) {
+          "MYCOBANK Database"
+        } else {
+          paste0("MycoBank #\n805901\nPhellinotus neoaridus\n", .mycobank_fake_page_text())
+        }
+        list(result = list(value = val))
+      }
+    )
+  )
+
+  det <- .mycobank_page_details(fake_session,
+                                "https://www.mycobank.org/page/Name%20details%20page/519849",
+                                taxon_name = "Phellinotus neoaridus")
+
+  expect_gte(n_checks, 3)
+  expect_equal(det$locality, "Brazil, Bahia")
+  expect_equal(det$substrate, "on dead wood")
+})
+
+
+test_that(".mycobank_page_details gives up after max_wait if the marker never appears", {
+  fake_session <- list(
+    Page = list(navigate = function(...) invisible(NULL),
+               loadEventFired = function(...) invisible(NULL)),
+    Runtime = list(
+      evaluate = function(...) list(result = list(value = "MYCOBANK Database"))
+    )
+  )
+
+  det <- .mycobank_page_details(fake_session, "https://example.com",
+                                taxon_name = "Some species", max_wait = 1)
+  expect_true(is.na(det$locality))
+  expect_true(is.na(det$substrate))
 })
 
 

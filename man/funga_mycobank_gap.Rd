@@ -2,12 +2,13 @@
 % Please edit documentation in R/funga_mycobank_gap.R
 \name{funga_mycobank_gap}
 \alias{funga_mycobank_gap}
-\title{Find fungal species in MycoBank that are potentially Brazilian but missing from FFB}
+\title{Find fungal species with MycoBank Brazil evidence that are missing from FFB}
 \usage{
 funga_mycobank_gap(
   taxon,
   rank = c("genus", "order"),
   check_locality = TRUE,
+  require_brazil_evidence = TRUE,
   max_check = 200,
   version = "latest",
   mycobank_dir = "mycobank_download",
@@ -28,9 +29,17 @@ or \code{"Xylariales"}).}
 
 \item{check_locality}{Logical. If \code{TRUE} (default), each MycoBank name missing
 from FFB has its own MycoBank name page visited (via \pkg{chromote}) to read the
-type specimen's reported locality and host/substrate, flagging candidates that
+type specimen's reported locality and host/substrate, determining which candidates
 MycoBank itself already associates with Brazil. Set to \code{FALSE} to skip this
-(much faster, but without locality evidence).}
+(much faster, but without locality evidence, and \code{require_brazil_evidence} has
+no effect).}
+
+\item{require_brazil_evidence}{Logical. If \code{TRUE} (default), the returned table is
+filtered to only the candidates whose MycoBank locality mentions Brazil - i.e. names
+MycoBank itself indicates occur in Brazil but that FFB is still missing. Set to
+\code{FALSE} to instead return every MycoBank species-level name missing from FFB
+regardless of locality (with \code{MycoBank_Brazil_Evidence} alongside for manual
+review). Only meaningful when \code{check_locality = TRUE}.}
 
 \item{max_check}{Numeric. Safety cap on how many missing candidates are sent through the
 (comparatively slow, one-page-load-per-name) locality check when
@@ -69,7 +78,8 @@ the rendered HTML report in the default browser.}
 }
 \value{
 A \code{data.frame}, one row per MycoBank species-level name found in the
-  requested genus/order that is absent from the current FFB checklist, with columns:
+  requested genus/order that is absent from the current FFB checklist and, by default,
+  whose MycoBank locality data indicates it occurs in Brazil, with columns:
 \describe{
   \item{MycoBank_Number}{MycoBank's numeric identifier for the name.}
   \item{Taxon_name}{The binomial as registered in MycoBank.}
@@ -89,11 +99,12 @@ A \code{data.frame}, one row per MycoBank species-level name found in the
 \description{
 Given a fungal genus or order, cross-checks \href{https://www.mycobank.org}{MycoBank}'s
 global nomenclatural database against the Flora e Funga do Brasil (FFB) checklist to
-flag species-level names that exist in MycoBank but are not currently registered in
-FFB. When \code{check_locality = TRUE} (default), each candidate's own MycoBank name
-page is additionally checked for a Brazilian type/specimen locality, so that taxonomic
-experts reviewing the output spreadsheet can prioritize candidates MycoBank itself
-already associates with Brazil.
+find species-level names that MycoBank itself already associates with a Brazilian
+locality but that are not currently registered in FFB. This is not a general diff of
+the two databases: a MycoBank name missing from FFB is only returned when MycoBank's
+own type/specimen locality data indicates it occurs in Brazil, so taxonomic experts get
+a shortlist of genuinely plausible new national records rather than every unrelated
+MycoBank name in the genus/order.
 }
 \details{
 MycoBank does not offer a public search API suited to bulk automation, but it does
@@ -103,32 +114,41 @@ that export locally (the same way \code{\link{funga_download}} caches the FFB da
 then filters it down to the requested genus or order using MycoBank's own
 \code{Classification} column.
 
-The bulk export itself carries no locality information, so when
-\code{check_locality = TRUE} each missing candidate's individual MycoBank name page
-(its \code{MycoBank_URL}) is visited to read the "Location details" (and
-"Host/Substrate") reported for its type specimen. MycoBank's name pages are a
-JavaScript single-page application with no static HTML fallback, so this step requires
-the \pkg{chromote} package (and a local Chrome/Chromium installation) to drive a
-headless browser; if unavailable, this step is skipped with a message and the
-locality columns are left \code{NA} (the FFB comparison itself is unaffected).
+The bulk export itself carries no locality information, so determining Brazil evidence
+requires visiting each missing candidate's individual MycoBank name page (its
+\code{MycoBank_URL}) to read the "Location details" (and "Host/Substrate") reported for
+its type specimen. MycoBank's name pages are a JavaScript single-page application with
+no static HTML fallback, so this step (\code{check_locality = TRUE}, the default)
+requires the \pkg{chromote} package (and a local Chrome/Chromium installation) to drive
+a headless browser. When \code{require_brazil_evidence = TRUE} (the default), the
+returned table is filtered down to only the candidates whose MycoBank locality
+mentions Brazil; set it to \code{FALSE} to instead get every MycoBank name missing from
+FFB regardless of locality (with the evidence columns alongside, for manual review).
+Brazil-evidence filtering has no effect if \code{check_locality = FALSE}, since no
+locality data is available to filter on; a message explains this when it happens.
 
 The FFB side of the comparison reuses \code{\link{funga_get_children_taxa}} to list every
 species (accepted and synonym) currently registered in FFB for the requested genus/order.
 }
 \examples{
 \dontrun{
-# Species-level names in MycoBank for genus Trichoderma missing from FFB,
-# with each candidate's own MycoBank locality/substrate
+# Species-level MycoBank names for genus Trichoderma that MycoBank's own
+# locality data places in Brazil but that are still missing from FFB
 gap <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus")
 
-# Faster, without the locality check
+# Every MycoBank name missing from FFB regardless of locality, for manual review
+gap_all <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
+                              require_brazil_evidence = FALSE)
+
+# Faster, without the locality check (no Brazil-evidence filtering possible)
 gap_fast <- funga_mycobank_gap(taxon = "Trichoderma", rank = "genus",
                                check_locality = FALSE)
 }
 
 }
 \seealso{
-\code{\link{funga_distribution_gap}}, \code{\link{funga_get_children_taxa}}
+\code{\link{funga_mycobank_records}}, \code{\link{funga_distribution_gap}},
+  \code{\link{funga_get_children_taxa}}
 }
 \author{
 Domingos Cardoso

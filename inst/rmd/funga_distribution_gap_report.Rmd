@@ -173,7 +173,7 @@ if (is.null(recs) || nrow(recs) == 0) {
   if ("RecordLink" %in% names(recs)) {
     recs$RecordLink <- ifelse(
       !is.na(recs$RecordLink) & nzchar(recs$RecordLink),
-      paste0('<a href="', recs$RecordLink, '" target="_blank">View record</a>'),
+      paste0('<a href="', recs$RecordLink, '" target="_blank">', recs$RecordLink, '</a>'),
       ""
     )
   }
