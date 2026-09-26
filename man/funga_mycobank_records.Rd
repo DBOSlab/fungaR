@@ -78,13 +78,26 @@ A \code{data.frame}, one row per matching MycoBank name and, by default, with
   \item{MycoBank_Number}{MycoBank's numeric identifier for the name.}
   \item{Taxon_name}{The binomial as registered in MycoBank.}
   \item{Authors}{Full author citation.}
+  \item{Year}{Year of effective publication.}
   \item{Name_status}{MycoBank's nomenclatural status (e.g. \code{"Legitimate"}).}
   \item{Classification}{Full MycoBank classification string (Kingdom to genus).}
   \item{Current_name}{MycoBank's currently accepted name for this entry, when different
     (i.e. when \code{Taxon_name} is itself a synonym).}
+  \item{Synonymy}{MycoBank's full synonymy text (current name and/or basionym, each with
+    its complete author/journal/year citation), from the bulk export.}
   \item{MycoBank_URL}{Direct link to the name's MycoBank page.}
   \item{MycoBank_Locality, MycoBank_Substrate}{Type specimen locality and host/substrate
     as reported on the name's own MycoBank page (only when \code{check_locality = TRUE}).}
+  \item{MycoBank_Etymology}{The name's etymology, as reported on its own MycoBank page
+    (only when \code{check_locality = TRUE}).}
+  \item{MycoBank_Name_Type}{MycoBank's nomenclatural name type for this entry (e.g.
+    \code{"Basionym"}, \code{"Combination"}; only when \code{check_locality = TRUE}).}
+  \item{MycoBank_Type_Specimen}{The type specimen voucher (e.g. \code{"URM 80362
+    holotype"}; only when \code{check_locality = TRUE}).}
+  \item{MycoBank_Collector}{The type specimen's collector, as reported on the name's own
+    MycoBank page (only when \code{check_locality = TRUE}).}
+  \item{MycoBank_Protolog}{The original-publication (protolog) citation, as reported on
+    the name's own MycoBank page (only when \code{check_locality = TRUE}).}
   \item{MycoBank_Brazil_Evidence}{Logical; \code{TRUE} when \code{MycoBank_Locality}
     mentions Brazil (only when \code{check_locality = TRUE}).}
 }
