@@ -35,6 +35,7 @@
 #' spfungorum_gap(
 #'   taxon,
 #'   require_brazil_evidence = TRUE,
+#'   fetch_details = TRUE,
 #'   max_number = 1000,
 #'   version = "latest",
 #'   verbose = TRUE,
@@ -55,6 +56,14 @@
 #'   indicates occur in Brazil but that FFB is still missing. Set to \code{FALSE} to
 #'   instead return every Index Fungorum species-level name missing from FFB regardless
 #'   of locality, with \code{Fungorum_Brazil_Evidence} alongside for manual review.
+#'
+#' @param fetch_details Logical. If \code{TRUE} (default), each missing candidate's own
+#'   Species Fungorum page is visited (a fast, plain HTTP request - no headless browser,
+#'   unlike MycoBank) to read the journal it was published in, the full formatted
+#'   citation, the basionym or typification details, the current name's own full
+#'   citation, and the Index Fungorum LSID - none of which are in the bulk
+#'   \code{NameSearch} response. Set to \code{FALSE} to skip this and return only the
+#'   fields already in that response.
 #'
 #' @param max_number Numeric. Maximum number of matching names requested from the web
 #'   service in a single call. Defaults to \code{1000}, generous for any genus.
@@ -90,13 +99,31 @@
 #'   \item{Fungorum_Number}{Index Fungorum's numeric record identifier for the name.}
 #'   \item{Taxon_name}{The binomial as registered in Index Fungorum.}
 #'   \item{Authors}{Author citation.}
+#'   \item{SpecificEpithet}{The bare specific epithet.}
 #'   \item{Year}{Year of publication.}
 #'   \item{Name_status}{Index Fungorum's nomenclatural status (e.g. \code{"Legitimate"}).}
 #'   \item{Current_name}{Index Fungorum's currently accepted name for this entry, when
-#'     different (i.e. when \code{Taxon_name} is itself a synonym).}
+#'     different (i.e. when \code{Taxon_name} is itself a synonym). When
+#'     \code{fetch_details = TRUE}, this is the freshly-scraped value from the name's own
+#'     page rather than the bulk search response's own (occasionally stale) field - though
+#'     note the FFB-comparison step above always uses the bulk value, since it runs before
+#'     any page is fetched.}
 #'   \item{Fungorum_Location, Fungorum_Host}{Type specimen locality and host, as reported
 #'     in Index Fungorum's own record (may be \code{NA} - not every record has these).}
+#'   \item{Volume, Part, Page}{The publication's volume, part/issue, and page.}
+#'   \item{PublishingAuthors}{Full author list of the publication the name appeared in,
+#'     which may differ from \code{Authors} (the name's own author citation).}
 #'   \item{Fungorum_URL}{Direct link to the name's Species Fungorum page.}
+#'   \item{Fungorum_Journal}{The journal the name was published in (only when
+#'     \code{fetch_details = TRUE}; not available from the bulk search response).}
+#'   \item{Fungorum_Citation}{The full formatted citation as shown on the name's own
+#'     Species Fungorum page (only when \code{fetch_details = TRUE}).}
+#'   \item{Fungorum_Basionym}{The basionym or typification details, when present (only
+#'     when \code{fetch_details = TRUE}).}
+#'   \item{Fungorum_Current_Name_Citation}{The full citation of the currently accepted
+#'     name (only when \code{fetch_details = TRUE}).}
+#'   \item{Fungorum_LSID}{The Index Fungorum Life Science Identifier (only when
+#'     \code{fetch_details = TRUE}).}
 #'   \item{Fungorum_Brazil_Evidence}{Logical; \code{TRUE} when \code{Fungorum_Location}
 #'     mentions Brazil.}
 #'   \item{In_FFB}{Always \code{FALSE} (kept for clarity when combining with other tables).}
@@ -125,6 +152,7 @@
 
 spfungorum_gap <- function(taxon,
                                require_brazil_evidence = TRUE,
+                               fetch_details = TRUE,
                                max_number = 1000,
                                version = "latest",
                                verbose = TRUE,
@@ -195,11 +223,16 @@ spfungorum_gap <- function(taxon,
     Fungorum_Number = missing$Fungorum_Number,
     Taxon_name = missing$Taxon_name,
     Authors = missing$Authors,
+    SpecificEpithet = missing$SpecificEpithet,
     Year = missing$Year,
     Name_status = missing$Name_status,
     Current_name = missing$Current_name,
     Fungorum_Location = missing$Location,
     Fungorum_Host = missing$Host,
+    Volume = missing$Volume,
+    Part = missing$Part,
+    Page = missing$Page,
+    PublishingAuthors = missing$PublishingAuthors,
     Fungorum_URL = ifelse(is.na(missing$Fungorum_Number), NA_character_,
                           paste0("https://www.speciesfungorum.org/names/NamesRecord.asp?RecordID=",
                                 missing$Fungorum_Number)),
@@ -220,6 +253,41 @@ spfungorum_gap <- function(taxon,
 
   result <- result[order(result$Taxon_name), ]
   rownames(result) <- NULL
+
+  # --------------------------------------------------------------------
+  # Optional per-record page visit for fields not in the bulk search
+  # response (journal, full citation, basionym, current name's own
+  # citation, LSID) - a fast, plain HTTP request per record, no headless
+  # browser needed (unlike MycoBank).
+  # --------------------------------------------------------------------
+  if (fetch_details && nrow(result) > 0) {
+    result$Fungorum_Journal <- NA_character_
+    result$Fungorum_Citation <- NA_character_
+    result$Fungorum_Basionym <- NA_character_
+    result$Fungorum_Current_Name_Citation <- NA_character_
+    result$Fungorum_LSID <- NA_character_
+
+    for (i in seq_len(nrow(result))) {
+      if (verbose) {
+        message(sprintf("  Fetching Index Fungorum details %d/%d: %s",
+                        i, nrow(result), result$Taxon_name[i]))
+      }
+      det <- .indexfungorum_record_page(result$Fungorum_Number[i])
+      result$Fungorum_Journal[i] <- det$journal
+      result$Fungorum_Citation[i] <- det$citation
+      result$Fungorum_Basionym[i] <- det$basionym_or_type
+      result$Fungorum_Current_Name_Citation[i] <- det$current_name_citation
+      result$Fungorum_LSID[i] <- det$lsid
+      # The freshly-scraped current name (from this record's own page) takes
+      # precedence over the bulk NameSearch response's Current_name, which is
+      # a cached value on the original name's row that can go stale relative
+      # to the current name's own record. Note this only corrects the
+      # *displayed* value for candidates already past the FFB-comparison
+      # step above, which still uses the bulk value; see the 'Current_name'
+      # entry under @return for the implication.
+      if (!is.na(det$current_name)) result$Current_name[i] <- det$current_name
+    }
+  }
 
   if (verbose) {
     message(sprintf("\n\u2713 %d candidate species found in Index Fungorum but missing from FFB",

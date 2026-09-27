@@ -4,6 +4,29 @@
 # so these tests run offline and do not depend on chromote/rmarkdown/DT
 # actually being usable in the test environment.
 
+test_that(".location_mentions_brazil matches the country name and Brazilian states, with word boundaries", {
+  expect_true(.location_mentions_brazil("Brazil, Bahia"))
+  expect_true(.location_mentions_brazil("Pernambuco"))
+  expect_true(.location_mentions_brazil("Acre"))
+  expect_true(.location_mentions_brazil("Sao Paulo"))  # no diacritics
+  expect_false(.location_mentions_brazil("Argentina"))
+  expect_false(.location_mentions_brazil(NA_character_))
+  expect_false(.location_mentions_brazil(""))
+
+  # Regression test: an unanchored substring match previously flagged
+  # "Paraguay" as Brazil evidence because "Para" (the ASCII-folded Brazilian
+  # state "Para") is contained within it. Word-boundary matching fixes this
+  # without breaking real matches on the state itself.
+  expect_false(.location_mentions_brazil("Paraguay"))
+  expect_true(.location_mentions_brazil("Para"))
+  expect_true(.location_mentions_brazil("Belem, Para, Brazil"))
+
+  # Another plausible false-positive case: "Acre" as a state should not
+  # match when it merely appears as a substring of an unrelated word.
+  expect_false(.location_mentions_brazil("sacred grove"))
+})
+
+
 test_that(".gbif_brazil_occurrence parses a real-shaped GBIF response", {
   fake_response <- list(
     count = 3L,
@@ -261,4 +284,76 @@ test_that(".save_xlsx writes a spreadsheet to the requested directory", {
   df <- data.frame(a = 1:3, b = c("x", "y", "z"))
   .save_xlsx(df, verbose = FALSE, filename = "myfile", dir = out_dir)
   expect_true(file.exists(file.path(out_dir, "myfile.xlsx")))
+})
+
+
+.fungorum_fake_page_html <- function(journal = "J. Fungi", basionym = TRUE) {
+  basionym_block <- if (basionym) {
+    paste0('<p><b>Basionym:</b><br><b><a href="/names/NamesRecord.asp?RecordId=1">',
+          '<em>Fomes badius</em></a></b>\u00a0Cooke\u00a01885</p>')
+  } else {
+    ""
+  }
+  paste0(
+    '<html><body><div class="card-header"><h4>',
+    '<strong><em><a href="/names/genusrecord.asp?RecordId=1">Phellinotus</a> badius</em></strong>',
+    ' (Cooke) Salvador-Mont., in Author List, <i>', journal, '</i> 8(3, no. 216): 8 (2022)',
+    '</h4></div>',
+    '<div class="card-body">',
+    basionym_block,
+    '<p><b>Current name:</b><br><strong><a href="/names/Synonymy.asp?RecordId=2">',
+    '<em>Fuscoporia gilva</em></a></strong> (Schwein.) T. Wagner &amp; M. Fisch., ',
+    '<i>Mycologia</i> 94(6): 1013 (2002)</p>',
+    '<p><b>Index Fungorum LSID:</b> urn:lsid:indexfungorum.org:names:840993</p>',
+    '</div></body></html>'
+  )
+}
+
+test_that(".indexfungorum_record_page extracts journal, citation, basionym, current name, and LSID", {
+  testthat::local_mocked_bindings(
+    readLines = function(...) .fungorum_fake_page_html(),
+    url = function(...) "fake-connection",
+    close = function(...) invisible(NULL),
+    .package = "base"
+  )
+
+  det <- .indexfungorum_record_page("840993")
+  expect_equal(det$journal, "J. Fungi")
+  expect_match(det$citation, "^Phellinotus badius")
+  expect_equal(det$basionym_or_type, "Fomes badius Cooke 1885")
+  expect_equal(det$current_name, "Fuscoporia gilva")
+  expect_match(det$current_name_citation, "^Fuscoporia gilva")
+  expect_equal(det$lsid, "urn:lsid:indexfungorum.org:names:840993")
+})
+
+
+test_that(".indexfungorum_record_page returns NA for basionym when the page has none", {
+  testthat::local_mocked_bindings(
+    readLines = function(...) .fungorum_fake_page_html(basionym = FALSE),
+    url = function(...) "fake-connection",
+    close = function(...) invisible(NULL),
+    .package = "base"
+  )
+
+  det <- .indexfungorum_record_page("840994")
+  expect_true(is.na(det$basionym_or_type))
+  expect_equal(det$current_name, "Fuscoporia gilva")
+})
+
+
+test_that(".indexfungorum_record_page degrades gracefully when the record number is missing", {
+  det <- .indexfungorum_record_page(NA_character_)
+  expect_true(is.na(det$journal))
+  expect_true(is.na(det$current_name))
+})
+
+
+test_that(".indexfungorum_record_page degrades gracefully when the fetch errors", {
+  testthat::local_mocked_bindings(
+    url = function(...) stop("network down"),
+    .package = "base"
+  )
+  det <- .indexfungorum_record_page("840993")
+  expect_true(is.na(det$journal))
+  expect_true(is.na(det$current_name))
 })

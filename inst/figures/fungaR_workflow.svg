@@ -1,108 +1,147 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 620" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 860" font-family="Helvetica, Arial, sans-serif">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#B5791E"/>
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1180" height="620" fill="#FBF8F0"/>
+  <rect x="0" y="0" width="1180" height="860" fill="#FBF8F0"/>
 
   <!-- Title -->
   <text x="40" y="42" font-size="24" font-weight="700" fill="#8A5A15">fungaR workflow</text>
   <text x="40" y="64" font-size="13" fill="#6b5638">Access and analyze Flora e Funga do Brasil fungal data, then help curate new records back into it</text>
 
+  <!-- Stages 1-3 are shifted +225 on x from their original left-margin
+       layout so this whole block sits horizontally centered within the
+       canvas (matching the visual center of Stage 4's full-width band
+       below), rather than looking stranded against the left edge under a
+       much wider diagram. Internal spacing/order is otherwise unchanged. -->
+
   <!-- ============ STAGE 1: Access &amp; parse ============ -->
-  <text x="40" y="100" font-size="14" font-weight="700" fill="#B5791E">1. ACCESS &amp; PARSE</text>
+  <text x="265" y="100" font-size="14" font-weight="700" fill="#B5791E">1. ACCESS &amp; PARSE</text>
 
   <g font-size="13.5">
-    <rect x="40" y="114" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="135" y="145" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_version()</text>
+    <rect x="265" y="114" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="360" y="145" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_version()</text>
 
-    <rect x="270" y="114" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="365" y="145" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_download()</text>
+    <rect x="495" y="114" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="590" y="145" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_download()</text>
 
-    <rect x="500" y="114" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="595" y="145" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_parse()</text>
+    <rect x="725" y="114" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="820" y="145" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_parse()</text>
   </g>
 
-  <line x1="230" y1="140" x2="266" y2="140" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="460" y1="140" x2="496" y2="140" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="455" y1="140" x2="491" y2="140" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="685" y1="140" x2="721" y2="140" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- connector: stage 1 -> stage 2. The horizontal jog sits BELOW the
        stage-2 header baseline (214) rather than above it, so the short
-       vertical segments dropping into the boxes at x=155/x=435 - which sit
+       vertical segments dropping into the boxes at x=380/x=660 - which sit
        directly under the header's left-aligned text - never cross the
        header's glyph band, regardless of which box they target. -->
-  <path d="M595,166 L595,222 L155,222 L155,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M595,166 L595,222 L435,222 L435,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M820,166 L820,222 L380,222 L380,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M820,166 L820,222 L660,222 L660,224" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- ============ STAGE 2: Explore &amp; filter ============ -->
-  <text x="40" y="214" font-size="14" font-weight="700" fill="#B5791E">2. EXPLORE &amp; FILTER THE CHECKLIST</text>
+  <text x="265" y="214" font-size="14" font-weight="700" fill="#B5791E">2. EXPLORE &amp; FILTER THE CHECKLIST</text>
 
   <g font-size="13.5">
-    <rect x="40" y="228" width="230" height="58" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="155" y="254" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_records()</text>
-    <text x="155" y="272" text-anchor="middle" fill="#8a7452" font-size="11">taxon / state / habitat / lifeForm</text>
+    <rect x="265" y="228" width="230" height="58" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="380" y="254" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_records()</text>
+    <text x="380" y="272" text-anchor="middle" fill="#8a7452" font-size="11">taxon / state / habitat / lifeForm</text>
 
-    <rect x="310" y="228" width="250" height="58" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="435" y="254" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_get_children_taxa()</text>
-    <text x="435" y="272" text-anchor="middle" fill="#8a7452" font-size="11">division / order / family / genus</text>
+    <rect x="535" y="228" width="250" height="58" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="660" y="254" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_get_children_taxa()</text>
+    <text x="660" y="272" text-anchor="middle" fill="#8a7452" font-size="11">division / order / family / genus</text>
   </g>
 
   <!-- connector: stage 2 -> stage 3. Same fix as above: jog sits below the
        stage-3 header baseline (336) so the vertical drop into funga_search()
-       at x=135 - directly under that header's left-aligned text - clears it. -->
-  <path d="M435,286 L435,344 L135,344 L135,346" fill="none" stroke="#B5791E" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
+       at x=360 - directly under that header's left-aligned text - clears it. -->
+  <path d="M660,286 L660,344 L360,344 L360,346" fill="none" stroke="#B5791E" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
 
   <!-- ============ STAGE 3: Resolve your own names ============ -->
-  <text x="40" y="336" font-size="14" font-weight="700" fill="#B5791E">3. RESOLVE YOUR OWN NAME LIST</text>
+  <text x="265" y="336" font-size="14" font-weight="700" fill="#B5791E">3. RESOLVE YOUR OWN NAME LIST</text>
 
   <g font-size="13.5">
-    <rect x="40" y="350" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="135" y="381" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_search()</text>
+    <rect x="265" y="350" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="360" y="381" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_search()</text>
 
-    <rect x="270" y="350" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
-    <text x="365" y="381" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_match()</text>
+    <rect x="495" y="350" width="190" height="52" rx="10" fill="#FCF3DE" stroke="#E0A22B" stroke-width="1.5"/>
+    <text x="590" y="381" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_match()</text>
   </g>
 
-  <line x1="230" y1="376" x2="266" y2="376" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="455" y1="376" x2="491" y2="376" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <!-- ============ STAGE 4: Curate new records (highlighted) ============ -->
-  <rect x="720" y="90" width="420" height="380" rx="16" fill="#FBEAC0" stroke="#B5791E" stroke-width="2.5"/>
-  <text x="740" y="120" font-size="14" font-weight="700" fill="#7A4A18">4. CURATE NEW RECORDS FOR FFB</text>
-  <text x="740" y="138" font-size="11" fill="#7A4A18">for taxonomic experts contributing to the platform</text>
+  <!-- ============ STAGE 4: Curate new records (highlighted, full width) ============ -->
+  <!-- A wide band below stages 1-3, not a narrow side column, so all five
+       curation functions have room without cramming. Grouped into three
+       sub-columns by data source (MycoBank / Index Fungorum / Brazilian
+       occurrence repositories), each converging into a single review box.
+       No connector is drawn from stages 1-3 into this band: every function
+       here takes a taxon name directly as a plain string argument, so using
+       it never actually requires running Steps 1-3 first - the color-coded
+       band and legend communicate that separation instead of a (misleading)
+       dependency arrow. -->
+  <rect x="40" y="430" width="1100" height="318" rx="16" fill="#FBEAC0" stroke="#B5791E" stroke-width="2.5"/>
+  <text x="60" y="460" font-size="14" font-weight="700" fill="#7A4A18">4. CURATE NEW RECORDS FOR FFB</text>
+  <text x="60" y="478" font-size="11" fill="#7A4A18">for taxonomic experts contributing to the platform &#8212; takes a taxon name directly, no Steps 1-3 required</text>
 
-  <g font-size="13.5">
-    <rect x="740" y="156" width="380" height="86" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
-    <text x="930" y="182" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_mycobank_gap()</text>
-    <text x="930" y="200" text-anchor="middle" fill="#7a6a4a" font-size="11">MycoBank names missing from FFB,</text>
-    <text x="930" y="215" text-anchor="middle" fill="#7a6a4a" font-size="11">cross-checked for Brazil evidence (GBIF / speciesLink)</text>
-
-    <rect x="740" y="264" width="380" height="86" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
-    <text x="930" y="290" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_distribution_gap()</text>
-    <text x="930" y="308" text-anchor="middle" fill="#7a6a4a" font-size="11">Brazilian states with specimen evidence</text>
-    <text x="930" y="323" text-anchor="middle" fill="#7a6a4a" font-size="11">(GBIF / speciesLink / REFLORA) absent from FFB</text>
-
-    <rect x="820" y="386" width="220" height="60" rx="10" fill="#B5791E"/>
-    <text x="930" y="412" text-anchor="middle" fill="#FFF8E8" font-weight="700">Taxonomist review</text>
-    <text x="930" y="430" text-anchor="middle" fill="#FFF8E8" font-size="11">&#8594; new records into FFB</text>
+  <g font-size="12" font-weight="700" fill="#7A4A18">
+    <text x="230" y="500" text-anchor="middle">MYCOBANK</text>
+    <text x="590" y="500" text-anchor="middle">INDEX FUNGORUM</text>
+    <text x="950" y="500" text-anchor="middle">BRAZILIAN OCCURRENCE DATA</text>
   </g>
 
-  <line x1="930" y1="242" x2="930" y2="260" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="930" y1="350" x2="930" y2="382" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <g font-size="13">
+    <!-- MycoBank column -->
+    <rect x="60" y="512" width="340" height="70" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
+    <text x="230" y="536" text-anchor="middle" fill="#8A5A15" font-weight="600">mycobank_gap()</text>
+    <text x="230" y="554" text-anchor="middle" fill="#7a6a4a" font-size="10.5">MycoBank names with Brazil evidence</text>
+    <text x="230" y="568" text-anchor="middle" fill="#7a6a4a" font-size="10.5">that are still missing from FFB</text>
 
-  <!-- connectors: stage 2 boxes' right edge -> stage 4 boxes (curves start exactly on the box border) -->
-  <path d="M560,257 C 650,257 690,199 736,199" fill="none" stroke="#B5791E" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
-  <path d="M560,257 C 650,257 690,307 736,307" fill="none" stroke="#B5791E" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
+    <rect x="60" y="594" width="340" height="70" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
+    <text x="230" y="618" text-anchor="middle" fill="#8A5A15" font-weight="600">mycobank_records()</text>
+    <text x="230" y="636" text-anchor="middle" fill="#7a6a4a" font-size="10.5">Retrieve MycoBank records</text>
+    <text x="230" y="650" text-anchor="middle" fill="#7a6a4a" font-size="10.5">for a Brazilian taxon</text>
 
-  <!-- Footer: legend + note, well below every box (left column ends y=402, right box ends y=470) -->
+    <!-- Index Fungorum column -->
+    <rect x="420" y="512" width="340" height="70" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
+    <text x="590" y="536" text-anchor="middle" fill="#8A5A15" font-weight="600">spfungorum_gap()</text>
+    <text x="590" y="554" text-anchor="middle" fill="#7a6a4a" font-size="10.5">Index Fungorum names with Brazil evidence</text>
+    <text x="590" y="568" text-anchor="middle" fill="#7a6a4a" font-size="10.5">that are still missing from FFB</text>
+
+    <rect x="420" y="594" width="340" height="70" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
+    <text x="590" y="618" text-anchor="middle" fill="#8A5A15" font-weight="600">spfungorum_records()</text>
+    <text x="590" y="636" text-anchor="middle" fill="#7a6a4a" font-size="10.5">Retrieve Index Fungorum records</text>
+    <text x="590" y="650" text-anchor="middle" fill="#7a6a4a" font-size="10.5">for a Brazilian taxon</text>
+
+    <!-- Brazilian occurrence data column (one taller box) -->
+    <rect x="780" y="512" width="340" height="152" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
+    <text x="950" y="540" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_distribution_gap()</text>
+    <text x="950" y="562" text-anchor="middle" fill="#7a6a4a" font-size="10.5">Brazilian states with specimen evidence</text>
+    <text x="950" y="578" text-anchor="middle" fill="#7a6a4a" font-size="10.5">(GBIF / speciesLink / REFLORA)</text>
+    <text x="950" y="594" text-anchor="middle" fill="#7a6a4a" font-size="10.5">absent from FFB's official</text>
+    <text x="950" y="610" text-anchor="middle" fill="#7a6a4a" font-size="10.5">distribution for that taxon</text>
+  </g>
+
+  <!-- Review box, fed by all three columns -->
+  <rect x="480" y="690" width="220" height="56" rx="10" fill="#B5791E"/>
+  <text x="590" y="714" text-anchor="middle" fill="#FFF8E8" font-weight="700">Taxonomist review</text>
+  <text x="590" y="730" text-anchor="middle" fill="#FFF8E8" font-size="11">&#8594; new records into FFB</text>
+
+  <path d="M230,664 L230,678 L540,678 L540,688" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="590" y1="664" x2="590" y2="688" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M950,664 L950,678 L640,678 L640,688" fill="none" stroke="#B5791E" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Footer: legend + note, well below every box -->
   <g font-size="11.5" fill="#6b5638">
-    <rect x="40" y="500" width="14" height="14" fill="#FCF3DE" stroke="#E0A22B"/>
-    <text x="60" y="511">Access, explore, and resolve names (Steps 1-3)</text>
-    <rect x="380" y="500" width="14" height="14" fill="#FBEAC0" stroke="#B5791E"/>
-    <text x="400" y="511">Fungi-specific curation tools (new in fungaR)</text>
+    <rect x="40" y="780" width="14" height="14" fill="#FCF3DE" stroke="#E0A22B"/>
+    <text x="60" y="791">Access, explore, and resolve names (Steps 1-3)</text>
+    <rect x="380" y="780" width="14" height="14" fill="#FBEAC0" stroke="#B5791E"/>
+    <text x="400" y="791">Fungi-specific curation tools (new in fungaR)</text>
   </g>
 
-  <text x="40" y="546" font-size="12" fill="#8a7a5a">Most functions in Steps 1-3 download and parse the FFB dataset automatically and cache it locally,</text>
-  <text x="40" y="564" font-size="12" fill="#8a7a5a">so funga_download()/funga_parse() rarely need to be called directly.</text>
+  <text x="40" y="822" font-size="12" fill="#8a7a5a">Most functions in Steps 1-3 download and parse the FFB dataset automatically and cache it locally,</text>
+  <text x="40" y="840" font-size="12" fill="#8a7a5a">so funga_download()/funga_parse() rarely need to be called directly.</text>
 </svg>

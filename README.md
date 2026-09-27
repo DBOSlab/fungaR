@@ -27,12 +27,19 @@ nutritional mode, substrate/host, and lichenization status) to resolving
 and matching your own species name lists against it.
 
 Beyond data retrieval, `fungaR` assists taxonomic experts contributing
-to FFB by cross-checking [MycoBank](https://www.mycobank.org) and
-Brazilian occurrence repositories ([GBIF](https://www.gbif.org),
+to FFB by cross-checking [MycoBank](https://www.mycobank.org), [Index
+Fungorum](https://www.speciesfungorum.org), and Brazilian occurrence
+repositories ([GBIF](https://www.gbif.org),
 [speciesLink](https://specieslink.net), and the [Reflora Virtual
 Herbarium](https://ipt.jbrj.gov.br/reflora/)) to flag fungal species and
 state records that are plausibly Brazilian but still missing from the
 platform.
+
+`fungaR`’s curation tools are designed to support the work of the [Rede
+de Taxonomistas da Funga do Brasil
+(RTFB)](https://redefunga.com.br/site/), a network connecting Brazil’s
+fungal taxonomists and coordinating the continuous documentation of the
+country’s fungal diversity in FFB.
 
 ## Workflow
 
@@ -335,6 +342,14 @@ Fungorum’s `LOCATION` field very often gives a state name directly
 (e.g. `"Pernambuco"`) rather than the country — but that are still
 missing from FFB.
 
+By default (`fetch_details = TRUE`) each missing candidate’s own Species
+Fungorum page is also visited — a fast, plain HTTP request, no headless
+browser needed — to read the journal it was published in, the full
+formatted citation, the basionym/typification details, and the Index
+Fungorum LSID, and to correct `Current_name` with the freshly-scraped
+value whenever the bulk search response’s own (occasionally stale) field
+differs.
+
 ``` r
 library(fungaR)
 
@@ -355,6 +370,17 @@ structured spreadsheet of Index Fungorum information for that taxon,
 including each name’s original Species Fungorum URL as a clickable link.
 Unlike `spfungorum_gap()`, this is not a comparison against FFB.
 
+Beyond the fields already in Index Fungorum’s bulk search response
+(author, year, classification, volume/part/page, publishing authors), by
+default (`fetch_details = TRUE`) each name’s own Species Fungorum page
+is also visited — a fast, plain HTTP request, no headless browser needed
+— to read the journal it was published in, the full formatted citation,
+the basionym/typification details, and the Index Fungorum LSID. This
+also corrects `Current_name`: Index Fungorum’s bulk search response
+caches that field on the *original* name’s own row, which can go stale
+relative to the current name’s own record, so the freshly-scraped value
+is preferred whenever available.
+
 ``` r
 library(fungaR)
 
@@ -365,6 +391,11 @@ sp <- spfungorum_records(taxon = "Phellinotus neoaridus")
 # Every Index Fungorum species-level name in genus Phellinotus with a
 # Brazilian reported locality
 genus_records <- spfungorum_records(taxon = "Phellinotus", rank = "genus")
+
+# Faster, without the per-record page visit (journal/citation/basionym/LSID
+# omitted, and Current_name uses the bulk response's value as-is)
+fast_records <- spfungorum_records(taxon = "Phellinotus", rank = "genus",
+                                   fetch_details = FALSE)
 ```
 
 #### *11. `funga_distribution_gap`: Find candidate new state records*

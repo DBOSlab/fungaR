@@ -7,6 +7,7 @@
 spfungorum_gap(
   taxon,
   require_brazil_evidence = TRUE,
+  fetch_details = TRUE,
   max_number = 1000,
   version = "latest",
   verbose = TRUE,
@@ -28,6 +29,14 @@ Brazil (the country name or any Brazilian state) - i.e. names Index Fungorum its
 indicates occur in Brazil but that FFB is still missing. Set to \code{FALSE} to
 instead return every Index Fungorum species-level name missing from FFB regardless
 of locality, with \code{Fungorum_Brazil_Evidence} alongside for manual review.}
+
+\item{fetch_details}{Logical. If \code{TRUE} (default), each missing candidate's own
+Species Fungorum page is visited (a fast, plain HTTP request - no headless browser,
+unlike MycoBank) to read the journal it was published in, the full formatted
+citation, the basionym or typification details, the current name's own full
+citation, and the Index Fungorum LSID - none of which are in the bulk
+\code{NameSearch} response. Set to \code{FALSE} to skip this and return only the
+fields already in that response.}
 
 \item{max_number}{Numeric. Maximum number of matching names requested from the web
 service in a single call. Defaults to \code{1000}, generous for any genus.}
@@ -64,13 +73,31 @@ A \code{data.frame}, one row per Index Fungorum species-level name found in
   \item{Fungorum_Number}{Index Fungorum's numeric record identifier for the name.}
   \item{Taxon_name}{The binomial as registered in Index Fungorum.}
   \item{Authors}{Author citation.}
+  \item{SpecificEpithet}{The bare specific epithet.}
   \item{Year}{Year of publication.}
   \item{Name_status}{Index Fungorum's nomenclatural status (e.g. \code{"Legitimate"}).}
   \item{Current_name}{Index Fungorum's currently accepted name for this entry, when
-    different (i.e. when \code{Taxon_name} is itself a synonym).}
+    different (i.e. when \code{Taxon_name} is itself a synonym). When
+    \code{fetch_details = TRUE}, this is the freshly-scraped value from the name's own
+    page rather than the bulk search response's own (occasionally stale) field - though
+    note the FFB-comparison step above always uses the bulk value, since it runs before
+    any page is fetched.}
   \item{Fungorum_Location, Fungorum_Host}{Type specimen locality and host, as reported
     in Index Fungorum's own record (may be \code{NA} - not every record has these).}
+  \item{Volume, Part, Page}{The publication's volume, part/issue, and page.}
+  \item{PublishingAuthors}{Full author list of the publication the name appeared in,
+    which may differ from \code{Authors} (the name's own author citation).}
   \item{Fungorum_URL}{Direct link to the name's Species Fungorum page.}
+  \item{Fungorum_Journal}{The journal the name was published in (only when
+    \code{fetch_details = TRUE}; not available from the bulk search response).}
+  \item{Fungorum_Citation}{The full formatted citation as shown on the name's own
+    Species Fungorum page (only when \code{fetch_details = TRUE}).}
+  \item{Fungorum_Basionym}{The basionym or typification details, when present (only
+    when \code{fetch_details = TRUE}).}
+  \item{Fungorum_Current_Name_Citation}{The full citation of the currently accepted
+    name (only when \code{fetch_details = TRUE}).}
+  \item{Fungorum_LSID}{The Index Fungorum Life Science Identifier (only when
+    \code{fetch_details = TRUE}).}
   \item{Fungorum_Brazil_Evidence}{Logical; \code{TRUE} when \code{Fungorum_Location}
     mentions Brazil.}
   \item{In_FFB}{Always \code{FALSE} (kept for clarity when combining with other tables).}

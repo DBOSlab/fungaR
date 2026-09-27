@@ -346,10 +346,14 @@
   if (is.null(location) || is.na(location) || !nzchar(location)) return(FALSE)
 
   loc_ascii <- stringi::stri_trans_general(location, "Latin-ASCII")
-  if (grepl("brazil|brasil", loc_ascii, ignore.case = TRUE)) return(TRUE)
+  if (grepl("\\bbrazil\\b|\\bbrasil\\b", loc_ascii, ignore.case = TRUE)) return(TRUE)
 
+  # Word-boundary match is essential here: an unanchored substring match
+  # would, for example, wrongly flag "Paraguay" as Brazil evidence because
+  # "Para" (the ASCII-folded Brazilian state "Para") is contained within it.
   states_ascii <- stringi::stri_trans_general(names(.br_states), "Latin-ASCII")
-  any(vapply(states_ascii, function(st) grepl(st, loc_ascii, ignore.case = TRUE),
+  any(vapply(states_ascii, function(st) grepl(paste0("\\b", st, "\\b"), loc_ascii,
+                                              ignore.case = TRUE),
             logical(1)))
 }
 
@@ -370,9 +374,12 @@
   rank <- match.arg(rank)
 
   empty <- data.frame(Taxon_name = character(0), Authors = character(0),
-                      Year = character(0), Rank = character(0),
-                      Name_status = character(0), Current_name = character(0),
-                      Location = character(0), Host = character(0),
+                      SpecificEpithet = character(0), Year = character(0),
+                      Rank = character(0), Name_status = character(0),
+                      Current_name = character(0), Location = character(0),
+                      Host = character(0), Volume = character(0),
+                      Part = character(0), Page = character(0),
+                      PublishingAuthors = character(0),
                       Fungorum_Number = character(0), stringsAsFactors = FALSE)
 
   doc <- tryCatch({
@@ -401,12 +408,17 @@
     data.frame(
       Taxon_name = get_field(node, "NAME_x0020_OF_x0020_FUNGUS"),
       Authors = get_field(node, "AUTHORS"),
+      SpecificEpithet = get_field(node, "SPECIFIC_x0020_EPITHET"),
       Year = get_field(node, "YEAR_x0020_OF_x0020_PUBLICATION"),
       Rank = get_field(node, "INFRASPECIFIC_x0020_RANK"),
       Name_status = get_field(node, "NAME_x0020_STATUS"),
       Current_name = get_field(node, "CURRENT_x0020_NAME"),
       Location = get_field(node, "LOCATION"),
       Host = get_field(node, "HOST"),
+      Volume = get_field(node, "VOLUME"),
+      Part = get_field(node, "PART"),
+      Page = get_field(node, "PAGE"),
+      PublishingAuthors = get_field(node, "PUBLISHING_x0020_AUTHORS"),
       Fungorum_Number = get_field(node, "RECORD_x0020_NUMBER"),
       stringsAsFactors = FALSE
     )
@@ -419,6 +431,94 @@
   result <- result[result$Rank %in% "sp." & !is.na(result$Taxon_name), ]
   rownames(result) <- NULL
   result
+}
+
+
+#_______________________________________________________________________________
+# Visit one Species Fungorum name page (a plain, server-rendered static HTML
+# page - unlike MycoBank, no JavaScript rendering or headless browser is
+# needed) to extract fields not present in the NameSearch API response: the
+# journal the name was published in (italicised in the page's citation
+# header, not exposed as its own XML field - only VOLUME/PART/PAGE/YEAR are),
+# the full formatted citation, the basionym or typification details, the
+# current name's own full citation, and the Index Fungorum LSID. Used by
+# spfungorum_gap()/spfungorum_records() to enrich their output beyond the
+# bulk NameSearch fields. xml2::read_html() has an unreliable HTTP backend of
+# its own for some hosts, so the page is fetched via base R's url()
+# connection first and the raw text handed to read_html() for parsing.
+# Never errors - any fetch or parsing failure is caught and every field
+# reported as NA, matching the package's defensive pattern for other
+# external lookups. ####
+.indexfungorum_record_page <- function(record_number) {
+  empty <- list(journal = NA_character_, citation = NA_character_,
+               basionym_or_type = NA_character_, current_name_citation = NA_character_,
+               current_name = NA_character_, lsid = NA_character_)
+
+  if (is.null(record_number) || is.na(record_number) || !nzchar(record_number)) {
+    return(empty)
+  }
+
+  doc <- tryCatch({
+    url <- paste0("https://www.speciesfungorum.org/names/NamesRecord.asp?RecordID=",
+                  record_number)
+    con <- url(url)
+    on.exit(try(close(con), silent = TRUE), add = TRUE)
+    txt <- paste(readLines(con, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+    xml2::read_html(txt)
+  }, error = function(e) NULL)
+
+  if (is.null(doc)) return(empty)
+
+  clean <- function(x) {
+    if (is.na(x) || !nzchar(x)) return(NA_character_)
+    x <- gsub("\u00a0", " ", x)
+    x <- trimws(gsub("\\s+", " ", x))
+    if (!nzchar(x)) NA_character_ else x
+  }
+
+  header <- xml2::xml_find_first(doc, "//div[@class='card-header']//h4")
+  journal <- clean(xml2::xml_text(xml2::xml_find_first(header, ".//i")))
+  citation <- clean(xml2::xml_text(header))
+
+  paras <- xml2::xml_find_all(doc, "//div[@class='card-body']/p")
+  find_labeled_para <- function(label_pattern) {
+    for (p in paras) {
+      b <- xml2::xml_find_first(p, ".//b")
+      b_txt <- xml2::xml_text(b)
+      if (!is.na(b_txt) && grepl(label_pattern, b_txt)) return(list(p = p, b_txt = b_txt))
+    }
+    NULL
+  }
+  get_labeled <- function(label_pattern) {
+    hit <- find_labeled_para(label_pattern)
+    if (is.null(hit)) return(NA_character_)
+    clean(sub(paste0("^", hit$b_txt), "", xml2::xml_text(hit$p)))
+  }
+
+  # The bare current name (no author/journal citation) is read directly from
+  # the <em> tag inside the "Current name:" paragraph, rather than regex-
+  # parsed out of the full citation text - far more robust against citation
+  # format variation, and always freshly scraped from this specific record's
+  # own page rather than the bulk NameSearch response's own CURRENT_NAME
+  # field, which is a cached value on the *original* name's row and can go
+  # stale relative to the current name's own record.
+  current_hit <- find_labeled_para("^Current name")
+  current_name <- if (is.null(current_hit)) {
+    NA_character_
+  } else {
+    clean(xml2::xml_text(xml2::xml_find_first(current_hit$p, ".//em")))
+  }
+  current_name_citation <- if (is.null(current_hit)) {
+    NA_character_
+  } else {
+    clean(sub(paste0("^", current_hit$b_txt), "", xml2::xml_text(current_hit$p)))
+  }
+
+  list(journal = journal, citation = citation,
+      basionym_or_type = get_labeled("Basionym|Typification Details"),
+      current_name_citation = current_name_citation,
+      current_name = current_name,
+      lsid = get_labeled("LSID"))
 }
 
 

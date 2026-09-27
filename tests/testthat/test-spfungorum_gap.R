@@ -4,6 +4,18 @@
     .package = "fungaR",
     .env = env
   )
+  # Keep tests offline/deterministic by default: no per-record page fetched
+  # (returns all-NA), so existing expectations about counts/filtering are
+  # unaffected by the fetch_details = TRUE default.
+  testthat::local_mocked_bindings(
+    .indexfungorum_record_page = function(record_number) {
+      list(journal = NA_character_, citation = NA_character_,
+          basionym_or_type = NA_character_, current_name_citation = NA_character_,
+          current_name = NA_character_, lsid = NA_character_)
+    },
+    .package = "fungaR",
+    .env = env
+  )
 }
 
 .mock_fungorum_gap_ffb <- function(taxon_names, env = parent.frame()) {
@@ -22,6 +34,7 @@
                   "Phellinotus neoaridus", "Phellinotus piptadeniae"),
     Authors = c("(Cooke) Salvador-Mont.", "Salvador-Mont.", "Drechsler-Santos & Robledo",
                "(Teixeira) Drechsler-Santos"),
+    SpecificEpithet = c("badius", "magnoporatus", "neoaridus", "piptadeniae"),
     Year = c("2022", "2022", "2016", "2016"),
     Rank = c("sp.", "sp.", "sp.", "sp."),
     Name_status = c("Legitimate", "Legitimate", "Legitimate", "Legitimate"),
@@ -30,6 +43,10 @@
     Location = c(NA_character_, "Peru", "Pernambuco", "Bahia"),
     Host = c(NA_character_, "on living tree of Ocotea aurantiodora",
             "on Caesalpinia", NA_character_),
+    Volume = c("8", "8", "261", "261"),
+    Part = c("3, no. 216", "3, no. 216", "3", "3"),
+    Page = c("8", "11", "224", "224"),
+    PublishingAuthors = rep("Salvador-Montoya et al.", 4),
     Fungorum_Number = c("840993", "840994", "805901", "805902"),
     stringsAsFactors = FALSE
   )
