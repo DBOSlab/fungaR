@@ -1,10 +1,10 @@
 # inst/CITATION
 
-citHeader("To cite the floraR package in publications, use:")
+citHeader("To cite the fungaR package in publications, use:")
 
 bibentry(
   bibtype = "Manual",
-  title = "floraR: Tools for Accessing, Analyzing, and Curating Data from the Flora e Funga do Brasil Platform",
+  title = "fungaR: Tools for Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do Brasil Platform",
   author = c(
     person(given = "Domingos",
              family = "Cardoso",
@@ -14,7 +14,7 @@ bibentry(
   ),
   year = 2026,
   note = "R package version 1.0.0",
-  url = "https://github.com/DBOSlab/floraR"
+  url = "https://github.com/DBOSlab/fungaR"
 )
 
-citFooter("This work was supported by CNPq and FINEP, with institutional support the Rio de Janeiro Botanical Garden (JBRJ).")
+citFooter("This work was supported by CNPq and FINEP, with institutional support from the Rio de Janeiro Botanical Garden (JBRJ).")
