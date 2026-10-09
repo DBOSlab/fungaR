@@ -8,7 +8,12 @@ Authors@R:
              family = "Cardoso",
              role = c("aut", "cre", "cph"),
              email = "domingoscardoso@jbrj.gov.br",
-             comment = c(ORCID = "0000-0001-7072-2656"))
+             comment = c(ORCID = "0000-0001-7072-2656")),
+    person(given = "Lucas",
+             family = "Jordão",
+             role = c("aut", "cph"),
+             email = "lucasjordao@jbrj.gov.br ",
+             comment = c(ORCID = "0000-0002-9501-0548"))
     )
 Maintainer: Domingos Cardoso <domingoscardoso@jbrj.gov.br>
 Description: The 'fungaR' package provides a comprehensive interface to the

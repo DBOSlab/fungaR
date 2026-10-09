@@ -1015,3 +1015,190 @@
 
   result_final
 }
+
+
+#_______________________________________________________________________________
+# GET a JSON web API URL and parse the response. Used by gbif_gap() to query
+# the GBIF REST API. Never errors - returns NULL on any failure. ####
+.get_json <- function(url) {
+  tryCatch({
+    con <- url(url, headers = c(Accept = "application/json"))
+    on.exit(try(close(con), silent = TRUE), add = TRUE)
+    txt <- paste(readLines(con, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+    jsonlite::fromJSON(txt, simplifyVector = FALSE)
+  }, error = function(e) NULL)
+}
+
+
+#_______________________________________________________________________________
+# Comparison key for scientific names across databases: case, diacritics,
+# hyphens, and the genitive "-ii"/"-i" ending are ignored, since these are
+# orthographic variants of one name that databases spell differently (e.g.
+# "freire-allemani" vs "freire-allemanii"). Used only for matching; output
+# tables keep each database's own spelling. ####
+.name_key <- function(x) {
+  x <- tolower(stringi::stri_trans_general(x, "Latin-ASCII"))
+  x <- gsub("-", "", x, fixed = TRUE)
+  x <- gsub("ii\\b", "i", x)
+  gsub("\\s+", " ", trimws(x))
+}
+
+
+#_______________________________________________________________________________
+# Names currently registered in FFB, for gbif_gap()'s comparison: 'genus'
+# holds every species-level name (accepted and synonym) filed under 'taxon';
+# 'all' holds every name in FFB at any rank, so that a candidate whose
+# accepted name sits in a different genus (GBIF and FFB can disagree on
+# generic placement) is still recognised as already in FFB. The dataset is
+# downloaded (or reused from the local cache) and parsed once. ####
+.ffb_names <- function(taxon, version = "latest") {
+  funga_download(version = version, dir = "funga_download", verbose = FALSE)
+  dwca <- funga_parse(path = "funga_download", version = version, verbose = FALSE)
+  tx <- .funga_get_taxon(dwca)
+  list(genus = unique(tx$taxonName[tx$genus %in% taxon & tx$taxonRank %in% "ESPECIE"]),
+       all = unique(tx$taxonName[!is.na(tx$taxonName)]))
+}
+
+
+#_______________________________________________________________________________
+# GBIF type-status values (GBIF's current vocabulary) counted as evidence
+# that a name's type material was collected in Brazil. Excludes "NotAType"
+# and non-type categories such as topotypes or plesiotypes. ####
+.gbif_type_status <- c("Type", "Holotype", "Isotype", "Lectotype", "Isolectotype",
+                       "Syntype", "Isosyntype", "Neotype", "Isoneotype", "Epitype",
+                       "Isoepitype", "Paratype", "Isoparatype", "Paralectotype",
+                       "OriginalMaterial", "TypeSeries")
+
+
+#_______________________________________________________________________________
+# Resolve a genus to its GBIF backbone key, restricted to the Fungi kingdom
+# only (unlike floraR's gbif_gap(), which searches the kingdoms holding
+# plants and algae). Returns list(key, name, kingdom) or NULL when no exact
+# genus match is found in Fungi. ####
+.gbif_kingdoms <- c("Fungi")
+
+.gbif_genus_key <- function(taxon) {
+  for (k in .gbif_kingdoms) {
+    res <- .get_json(sprintf("https://api.gbif.org/v1/species/match?name=%s&rank=GENUS&kingdom=%s&strict=true",
+                             utils::URLencode(taxon, reserved = TRUE),
+                             utils::URLencode(k, reserved = TRUE)))
+    if (!is.null(res) && identical(res$matchType, "EXACT") && identical(res$rank, "GENUS") &&
+        identical(res$kingdom, k)) {
+      return(list(key = res$usageKey, name = res$scientificName, kingdom = res$kingdom))
+    }
+  }
+  NULL
+}
+
+
+#_______________________________________________________________________________
+# Every GBIF name within a genus that has type specimens collected in Brazil,
+# with the number of such specimens - one faceted occurrence request for the
+# whole genus, however many specimens it has. Returns a data.frame
+# (GBIF_Key, N_type_specimens); NULL when the request fails. ####
+.gbif_brazil_type_counts <- function(genus_key, type_status = .gbif_type_status) {
+  url <- sprintf(paste0("https://api.gbif.org/v1/occurrence/search?taxonKey=%s&country=BR%s",
+                        "&limit=0&facet=taxonKey&facetLimit=100000"),
+                 genus_key, paste0("&typeStatus=", type_status, collapse = ""))
+  res <- .get_json(url)
+  if (is.null(res)) return(NULL)
+  counts <- if (length(res$facets) > 0) res$facets[[1]]$counts else list()
+  data.frame(GBIF_Key = vapply(counts, function(x) as.character(x$name), character(1)),
+             N_type_specimens = vapply(counts, function(x) as.integer(x$count), integer(1)),
+             stringsAsFactors = FALSE)
+}
+
+
+#_______________________________________________________________________________
+# Every name in the GBIF backbone within a genus (accepted names and
+# synonyms, all ranks), paginated 1000 at a time, with its accepted species.
+# Used to turn the numeric keys of .gbif_brazil_type_counts() into names.
+# Never errors - returns what could be retrieved. ####
+.gbif_genus_names <- function(genus_key) {
+  backbone <- "d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
+  val <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
+  rows <- list()
+  offset <- 0
+  repeat {
+    res <- .get_json(sprintf("https://api.gbif.org/v1/species/search?highertaxonKey=%s&datasetKey=%s&limit=1000&offset=%d",
+                             genus_key, backbone, offset))
+    if (is.null(res) || length(res$results) == 0) break
+    rows <- c(rows, lapply(res$results, function(r) {
+      data.frame(GBIF_Key = val(r$key),
+                 Taxon_name = val(r$canonicalName),
+                 Authors = val(r$authorship),
+                 Rank = val(r$rank),
+                 Taxonomic_status = val(r$taxonomicStatus),
+                 Accepted_name = val(r$species),
+                 Accepted_full_name = if (is.null(r$accepted)) val(r$scientificName) else val(r$accepted),
+                 Genus = val(r$genus),
+                 GBIF_Published_in = val(r$publishedIn),
+                 stringsAsFactors = FALSE)
+    }))
+    offset <- offset + 1000
+    if (isTRUE(res$endOfRecords)) break
+  }
+  if (length(rows) == 0) {
+    return(data.frame(GBIF_Key = character(0), Taxon_name = character(0),
+                      Authors = character(0), Rank = character(0),
+                      Taxonomic_status = character(0), Accepted_name = character(0),
+                      Accepted_full_name = character(0), Genus = character(0),
+                      GBIF_Published_in = character(0), stringsAsFactors = FALSE))
+  }
+  out <- do.call(rbind, rows)
+  out[!duplicated(out$GBIF_Key), ]
+}
+
+
+#_______________________________________________________________________________
+# The Brazilian type specimens of a set of GBIF name keys, fetched many keys
+# per request (GBIF accepts repeated taxonKey parameters) rather than one
+# request per name. At most 'max_per_batch' specimens are read per batch of
+# keys - enough to summarize each name's types, since the total counts come
+# from .gbif_brazil_type_counts(). A query for a key also returns the types
+# of that name's synonyms (filed under their own keys), so each specimen
+# keeps its own, accepted, and species keys for gbif_gap() to assign it to
+# the requested name. Returns one row per specimen. ####
+.gbif_type_specimens <- function(keys, type_status = .gbif_type_status,
+                                 batch_size = 10, max_per_batch = 900) {
+  val <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
+  batches <- split(keys, ceiling(seq_along(keys) / batch_size))
+  rows <- list()
+  for (b in batches) {
+    offset <- 0
+    repeat {
+      url <- sprintf("https://api.gbif.org/v1/occurrence/search?country=BR%s%s&limit=300&offset=%d",
+                     paste0("&taxonKey=", b, collapse = ""),
+                     paste0("&typeStatus=", type_status, collapse = ""), offset)
+      res <- .get_json(url)
+      if (is.null(res) || length(res$results) == 0) break
+      rows <- c(rows, lapply(res$results, function(r) {
+        data.frame(GBIF_Key = val(r$taxonKey),
+                   Accepted_key = val(r$acceptedTaxonKey),
+                   Species_key = val(r$speciesKey),
+                   Specimen_name = val(r$scientificName),
+                   Occurrence_ID = val(r$key),
+                   Type_status = val(paste(unlist(r$typeStatus), collapse = ", ")),
+                   Typified_name = val(r$typifiedName),
+                   Institution = val(r$institutionCode),
+                   Catalog_number = val(r$catalogNumber),
+                   Collector = val(r$recordedBy),
+                   Year = val(r$year),
+                   State = val(r$stateProvince),
+                   stringsAsFactors = FALSE)
+      }))
+      offset <- offset + 300
+      if (isTRUE(res$endOfRecords) || offset >= max_per_batch) break
+    }
+  }
+  if (length(rows) == 0) {
+    return(data.frame(GBIF_Key = character(0), Accepted_key = character(0),
+                      Species_key = character(0), Specimen_name = character(0),
+                      Occurrence_ID = character(0),
+                      Type_status = character(0), Typified_name = character(0),
+                      Institution = character(0), Catalog_number = character(0),
+                      Collector = character(0), Year = character(0), State = character(0),
+                      stringsAsFactors = FALSE))
+  }
+  do.call(rbind, rows)
+}
