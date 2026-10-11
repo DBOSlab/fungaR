@@ -151,7 +151,8 @@ funga_download <- function(version = "latest",
 
       utils::download.file(url =  dwca_file,
                            destfile = destzipfile,
-                           method = "curl")
+                           method = "libcurl",
+                           headers = .ipt_http_headers())
 
       utils::unzip(destzipfile, exdir = funga_database)
       unlink(destzipfile)
@@ -239,7 +240,8 @@ funga_download <- function(version = "latest",
 
             utils::download.file(url =  dwca_file,
                                  destfile = destzipfile,
-                                 method = "curl")
+                                 method = "libcurl",
+                                 headers = .ipt_http_headers())
 
             utils::unzip(destzipfile, exdir = funga_database)
             unlink(destzipfile)

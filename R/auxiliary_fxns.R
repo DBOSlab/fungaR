@@ -1,6 +1,14 @@
 # Auxiliary functions to support main functions
-# Author: Domingos Cardoso
+# Authors: Domingos Cardoso & Lucas Jordao
 
+#_______________________________________________________________________________
+# Shared HTTP headers for the JBRJ IPT metadata and archive requests.
+.ipt_http_headers <- function() {
+  c(`User-Agent` = "Mozilla/5.0 (compatible; floraR/1; Linux)")
+}
+
+
+#_______________________________________________________________________________
 # The 26 Brazilian states plus the Federal District (name = full name,
 # value = 2-letter abbreviation). Shared by .arg_check_state() (state-argument
 # validation) and .location_mentions_brazil() (checking whether an external
