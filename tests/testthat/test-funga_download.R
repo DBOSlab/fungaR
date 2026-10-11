@@ -25,7 +25,7 @@
     download.file = function(url, destfile, method, headers) {
       expect_identical(method, "libcurl")
       expect_identical(headers,
-                       c(`User-Agent` = "Mozilla/5.0 (compatible; floraR/1; Linux)"))
+                       c(`User-Agent` = "Mozilla/5.0 (compatible; fungaR/1; Linux)"))
       writeLines("mock zip content", destfile)
       invisible(0L)
     },

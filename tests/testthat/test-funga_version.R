@@ -29,7 +29,7 @@
       expect_identical(description,
                        "https://ipt.jbrj.gov.br/jbrj/resource?r=lista_especies_flora_brasil")
       expect_identical(headers,
-                       c(`User-Agent` = "Mozilla/5.0 (compatible; floraR/1; Linux)"))
+                       c(`User-Agent` = "Mozilla/5.0 (compatible; fungaR/1; Linux)"))
       textConnection(html_lines)
     },
     .package = "base",
