@@ -25,11 +25,24 @@
 
 .mock_funga_version <- function(html_lines, env = parent.frame()) {
   testthat::local_mocked_bindings(
-    readLines = function(...) html_lines,
+    url = function(description, headers) {
+      expect_identical(description,
+                       "https://ipt.jbrj.gov.br/jbrj/resource?r=lista_especies_flora_brasil")
+      expect_identical(headers,
+                       c(`User-Agent` = "Mozilla/5.0 (compatible; floraR/1; Linux)"))
+      textConnection(html_lines)
+    },
     .package = "base",
     .env = env
   )
 }
+
+
+test_that("funga_version sends the JBRJ IPT User-Agent", {
+  .mock_funga_version(.funga_version_mock_html())
+
+  expect_s3_class(funga_version(), "data.frame")
+})
 
 
 test_that("funga_version parses version, date, records, and URL from IPT metadata", {
