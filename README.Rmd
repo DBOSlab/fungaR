@@ -344,7 +344,7 @@ Full function documentation and articles are available at the `fungaR` [website]
 
 
 ## Citation
-Cardoso, D., Jordão, L. & Drechsler-Santos, E.R. 2026. fungaR: Tools for Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do Brasil Platform. https://github.com/dboslab/fungaR
+Cardoso, D., Jordão, L., Rezende, D.H.C., Alves-Silva, G., Martins-da-Cunha, K., Góes-Neto, A., Drechsler-Santos, E.R. 2026. fungaR: Tools for Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do Brasil Platform. https://github.com/DBOSlab/fungaR
 
 
 

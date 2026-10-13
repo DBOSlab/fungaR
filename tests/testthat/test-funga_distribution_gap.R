@@ -152,7 +152,7 @@ test_that("funga_distribution_gap writes a real .xlsx file when save = TRUE", {
 })
 
 
-test_that("funga_distribution_gap includes REFLORA evidence when refloraR is installed", {
+test_that("funga_distribution_gap includes Reflora evidence when refloraR is installed", {
   skip_if_not_installed("refloraR")
 
   .mock_funga_distribution_records("Trichoderma harzianum", ffb_states = "BA")
@@ -177,14 +177,14 @@ test_that("funga_distribution_gap includes REFLORA evidence when refloraR is ins
                                    sources = "reflora", save = FALSE, html_report = FALSE,
                                    verbose = FALSE)
 
-  expect_true("REFLORA_records" %in% names(result))
+  expect_true("Reflora_records" %in% names(result))
   pe_row <- result[result$State == "Pernambuco", ]
-  expect_equal(pe_row$REFLORA_records, 2L)
+  expect_equal(pe_row$Reflora_records, 2L)
   expect_true(pe_row$New_state_record_candidate)
 })
 
 
-test_that("funga_distribution_gap skips REFLORA gracefully when refloraR is not installed", {
+test_that("funga_distribution_gap skips Reflora gracefully when refloraR is not installed", {
   testthat::local_mocked_bindings(
     requireNamespace = function(pkg, ...) if (identical(pkg, "refloraR")) FALSE else TRUE,
     .package = "base"
@@ -197,7 +197,7 @@ test_that("funga_distribution_gap skips REFLORA gracefully when refloraR is not 
                                    sources = c("gbif", "reflora"), save = FALSE,
                                    html_report = FALSE, verbose = FALSE)
 
-  expect_false("REFLORA_records" %in% names(result) && any(!is.na(result$REFLORA_records)))
+  expect_false("Reflora_records" %in% names(result) && any(!is.na(result$Reflora_records)))
 })
 
 
