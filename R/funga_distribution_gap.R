@@ -16,7 +16,7 @@
 #' (no key required, and the most reliable of the three), speciesLink's public web service
 #' (best-effort - see \code{\link{mycobank_gap}}'s Note on its known SSL/endpoint
 #' issues), and the \pkg{refloraR} package's \code{\link[refloraR]{reflora_records}} for
-#' REFLORA specimen data (used only if the \pkg{refloraR} package is installed).
+#' Reflora specimen data (used only if the \pkg{refloraR} package is installed).
 #'
 #' @usage
 #' funga_distribution_gap(
@@ -61,7 +61,7 @@
 #'   evidence-by-source breakdown, the full state-by-state table, and the individual
 #'   occurrence records (not aggregated) found in the new-state-record candidate states -
 #'   each linking out to the specific record in its source database (GBIF occurrence page
-#'   or REFLORA specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
+#'   or Reflora specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
 #'   to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown}, \pkg{DT}, and
 #'   \pkg{htmltools} packages; if any is missing, the report is skipped with a message
 #'   (the \code{.xlsx} spreadsheet is unaffected).
@@ -79,7 +79,7 @@
 #'     \code{"gbif" \%in\% sources}).}
 #'   \item{speciesLink_evidence}{Logical; whether speciesLink reported this state
 #'     (best-effort, see Details).}
-#'   \item{REFLORA_records}{Number of REFLORA specimen records in this state (when
+#'   \item{Reflora_records}{Number of Reflora specimen records in this state (when
 #'     \code{"reflora" \%in\% sources} and \pkg{refloraR} is installed).}
 #'   \item{New_state_record_candidate}{\code{TRUE} when the state has evidence from at
 #'     least one external source but is \emph{not} in \code{In_FFB_distribution} - i.e. a
@@ -169,25 +169,25 @@ funga_distribution_gap <- function(taxon,
     }
   }
 
-  reflora_states_df <- data.frame(State = character(0), REFLORA_records = integer(0))
+  reflora_states_df <- data.frame(State = character(0), Reflora_records = integer(0))
   if ("reflora" %in% sources) {
     if (!requireNamespace("refloraR", quietly = TRUE)) {
       if (verbose) {
-        message("  Package 'refloraR' is not installed; skipping REFLORA evidence. ",
+        message("  Package 'refloraR' is not installed; skipping Reflora evidence. ",
                "Install it with install.packages('refloraR') to include this source.")
       }
     } else {
-      if (verbose) message("Querying REFLORA specimen records (via refloraR)...")
+      if (verbose) message("Querying Reflora specimen records (via refloraR)...")
       reflora_result <- tryCatch({
         refloraR::reflora_records(taxon = taxon, verbose = FALSE, save = FALSE)
       }, error = function(e) {
-        if (verbose) message("  REFLORA query failed: ", conditionMessage(e))
+        if (verbose) message("  Reflora query failed: ", conditionMessage(e))
         NULL
       })
       if (!is.null(reflora_result) && nrow(reflora_result) > 0 &&
           "stateProvince" %in% names(reflora_result)) {
         tab <- table(.arg_check_state(stats::na.omit(reflora_result$stateProvince)))
-        reflora_states_df <- data.frame(State = names(tab), REFLORA_records = as.integer(tab),
+        reflora_states_df <- data.frame(State = names(tab), Reflora_records = as.integer(tab),
                                         stringsAsFactors = FALSE)
       }
     }
@@ -226,7 +226,7 @@ funga_distribution_gap <- function(taxon,
     result$speciesLink_evidence <- result$State %in% splink_states
   }
   if ("reflora" %in% sources) {
-    result$REFLORA_records <- reflora_states_df$REFLORA_records[match(result$State, reflora_states_df$State)]
+    result$Reflora_records <- reflora_states_df$Reflora_records[match(result$State, reflora_states_df$State)]
   }
 
   result$New_state_record_candidate <- !result$In_FFB_distribution
@@ -246,7 +246,7 @@ funga_distribution_gap <- function(taxon,
 
   if (html_report && nrow(result) > 0) {
     source_summary <- data.frame(
-      source = c("FFB (official)", "GBIF", "speciesLink", "REFLORA"),
+      source = c("FFB (official)", "GBIF", "speciesLink", "Reflora"),
       n_states = c(
         length(ffb_states),
         if ("gbif" %in% sources) nrow(gbif_states_df) else NA_integer_,
@@ -298,7 +298,7 @@ funga_distribution_gap <- function(taxon,
       if (nrow(reflora_cand) > 0) {
         col <- function(nm) if (nm %in% names(reflora_cand)) reflora_cand[[nm]] else NA
         records_detail <- rbind(records_detail, data.frame(
-          Source = "REFLORA",
+          Source = "Reflora",
           State = .arg_check_state(reflora_cand$stateProvince),
           Municipality = col("municipality"),
           Locality = col("locality"),

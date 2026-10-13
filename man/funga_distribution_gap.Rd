@@ -47,7 +47,7 @@ HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, 
 evidence-by-source breakdown, the full state-by-state table, and the individual
 occurrence records (not aggregated) found in the new-state-record candidate states -
 each linking out to the specific record in its source database (GBIF occurrence page
-or REFLORA specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
+or Reflora specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
 to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown}, \pkg{DT}, and
 \pkg{htmltools} packages; if any is missing, the report is skipped with a message
 (the \code{.xlsx} spreadsheet is unaffected).}
@@ -66,7 +66,7 @@ A \code{data.frame}, one row per Brazilian state with any occurrence evidence
     \code{"gbif" \%in\% sources}).}
   \item{speciesLink_evidence}{Logical; whether speciesLink reported this state
     (best-effort, see Details).}
-  \item{REFLORA_records}{Number of REFLORA specimen records in this state (when
+  \item{Reflora_records}{Number of Reflora specimen records in this state (when
     \code{"reflora" \%in\% sources} and \pkg{refloraR} is installed).}
   \item{New_state_record_candidate}{\code{TRUE} when the state has evidence from at
     least one external source but is \emph{not} in \code{In_FFB_distribution} - i.e. a
@@ -89,7 +89,7 @@ comes from up to three independent sources (see \code{sources}): GBIF's public R
 (no key required, and the most reliable of the three), speciesLink's public web service
 (best-effort - see \code{\link{mycobank_gap}}'s Note on its known SSL/endpoint
 issues), and the \pkg{refloraR} package's \code{\link[refloraR]{reflora_records}} for
-REFLORA specimen data (used only if the \pkg{refloraR} package is installed).
+Reflora specimen data (used only if the \pkg{refloraR} package is installed).
 }
 \examples{
 \dontrun{
