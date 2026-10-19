@@ -50,7 +50,6 @@ library(fungaR)
 ```
 
 
-
 ## Usage
 
 `fungaR` supports a full workflow for working with Flora e Funga do Brasil fungal data:
@@ -81,7 +80,6 @@ head(versions_df)
 # View specific version details
 versions_df[versions_df$Latest == TRUE, ]
 ```
-
 
 
 #### _2. `funga_download`: Download Flora e Funga do Brasil datasets_
@@ -116,7 +114,6 @@ funga_download(
 ```
 
 
-
 #### _3. `funga_parse`: Parse downloaded DwC-A datasets_
 
 Parse and organize locally downloaded Flora e Funga do Brasil datasets for analysis, keeping only the Fungi kingdom. This function works offline once datasets are downloaded, and returns a named list with a `taxon.txt`, `distribution.txt`, and `speciesprofile.txt` table (among others) per downloaded version.
@@ -138,10 +135,13 @@ distribution_data <- dwca_data[["dwca_ffb_v393_418"]][["data"]][["distribution.t
 ```
 
 
-
 #### _4. `funga_records`: Filter and retrieve checklist records_
 
-Browse and filter the FFB checklist directly by taxonomic, geographic, and trait-based criteria — no input name list required. Downloads and parses the dataset automatically (like `funga_search()`, reusing the local cache on repeated calls). For fungi, the `habitat` argument doubles as substrate/host information (e.g. `"Planta viva - raiz"`, `"Tronco em decomposicao"`, `"Outro fungo"`), since FFB does not publish a separate named host-taxon field.
+Browse and filter the FFB checklist directly by taxonomic, geographic, and trait-based criteria — no input name list required. Downloads and parses the dataset automatically (like `funga_search()`, reusing the local cache on repeated calls). For fungi, the `habitat` argument doubles as substrate/host information (e.g. `"Planta viva - raiz"`, `"Tronco em decomposicao"`, `"Outro fungo"`), since FFB does not publish a separate named host-taxon field. Every result is appended with the taxon's full FFB distribution and species profile (`state`, `phytogeographicDomain`, `endemism`, `establishmentMeans`, `lifeForm`, `habitat`, `vegetationType`), each cell concatenating that taxon's distinct recorded values with `" | "` (e.g. `"BA | MG | PE"`) — regardless of which filters were applied.
+
+`endemism` means **endemic to Brazil** in FFB. Combined with an area filter (`state`, `phytogeographicDomain`, or `vegetationType`), `endemism = TRUE` narrows further to taxa whose entire FFB range is *exclusive* to that area — so `state = "Bahia", endemism = TRUE` returns taxa found only in Bahia, not every Brazilian endemic that merely also occurs there. Use `endemism = "Brazil"` instead when you want Brazilian endemics that occur in an area, wherever else in Brazil they also occur.
+
+`establishmentMeans` filters by the taxon's origin in Brazil — `"native"` or `"introduced"` (English or Portuguese, accent-insensitive).
 
 ```r
 library(fungaR)
@@ -150,10 +150,19 @@ library(fungaR)
 hymeno <- funga_records(taxon = "Hymenochaetaceae",
                         taxonomicStatus = "NOME_ACEITO")
 
-# Accepted species endemic to Bahia
+# Species endemic to Bahia: found only in Bahia (not just occurring there)
 bahia_endemics <- funga_records(state = "Bahia",
                                 endemism = TRUE,
                                 taxonomicStatus = "NOME_ACEITO")
+
+# Brazilian endemics that occur in Bahia (and possibly elsewhere too)
+brazil_endemics_in_bahia <- funga_records(state = "Bahia",
+                                          endemism = "Brazil",
+                                          taxonomicStatus = "NOME_ACEITO")
+
+# Introduced (exotic) species recorded in Bahia
+bahia_introduced <- funga_records(state = "Bahia",
+                                  establishmentMeans = "introduced")
 
 # Lichenized fungi recorded in the Caatinga
 caatinga_lichens <- funga_records(phytogeographicDomain = "Caatinga",
@@ -164,12 +173,11 @@ root_associates <- funga_records(habitat = "Planta viva - raiz")
 
 # Save the result to a CSV file
 funga_records(
- taxon = "Trichoderma", 
- save = TRUE, 
+ taxon = "Trichoderma",
+ save = TRUE,
  dir = "funga_records"
 )
 ```
-
 
 
 #### _5. `funga_search` and `funga_match`: Resolve your own species names_
@@ -192,7 +200,6 @@ splist1 <- c("Trichoderma harzianum", "Xylaria polymorpha", "Cookeina tricholoma
 splist2 <- c("Hypocrea lixii", "Xylaria polymorpha", "Cookeina sulcipes")
 funga_match(splist1, splist2, include_all = TRUE)
 ```
-
 
 
 #### _6. `funga_get_children_taxa`: Explore the taxonomic hierarchy_
@@ -220,10 +227,10 @@ funga_get_children_taxa(taxon_name = "Agaricales",
 ```
 
 
-
 ## Data Curation Workflow
 
 `fungaR` also supports taxonomic experts in curating and expanding Flora e Funga do Brasil's fungal coverage, by cross-checking global mycological and biodiversity repositories. `mycobank_gap()`, `mycobank_records()`, `spfungorum_gap()`, `spfungorum_records()`, and `funga_distribution_gap()` all write their results in three complementary forms: the returned `data.frame`, a downloadable `.xlsx` spreadsheet, and — by default (`html_report = TRUE`) — a self-contained **HTML report** with KPI counts, breakdown tables, and the full candidate/record table as a sortable, filterable [`DT`](https://rstudio.github.io/DT/) widget with one-click **copy/CSV/Excel download** buttons, opened automatically in your browser in interactive sessions.
+
 
 #### _7. `mycobank_gap`: Find MycoBank species with Brazil evidence missing from FFB_
 
@@ -246,7 +253,6 @@ gap_fast <- mycobank_gap(taxon = "Trichoderma", rank = "genus",
 ```
 
 
-
 #### _8. `mycobank_records`: Retrieve MycoBank records for a Brazilian taxon_
 
 Given a species, genus, or order, retrieves every matching MycoBank name and, by default (`require_brazil_evidence = TRUE`), filters it down to only the names whose own MycoBank locality mentions Brazil — a structured spreadsheet of MycoBank information for that taxon, combining the bulk export's own fields (author, year, classification, full synonymy citation) with several fields only available on each name's individual page (locality, substrate/host, etymology, name type, type specimen, collector, protolog), plus each name's original MycoBank URL as a clickable link. Unlike `mycobank_gap()`, this is not a comparison against FFB: it doesn't matter whether the taxon is already registered there.
@@ -260,7 +266,6 @@ sp <- mycobank_records(taxon = "Trichoderma harzianum")
 # Every MycoBank species-level name in genus Trichoderma with a Brazilian MycoBank locality
 genus_records <- mycobank_records(taxon = "Trichoderma", rank = "genus")
 ```
-
 
 
 #### _9. `spfungorum_gap`: Find Index Fungorum species with Brazil evidence missing from FFB_
@@ -279,7 +284,6 @@ gap <- spfungorum_gap(taxon = "Phellinotus")
 # Every Index Fungorum name missing from FFB regardless of locality, for manual review
 gap_all <- spfungorum_gap(taxon = "Phellinotus", require_brazil_evidence = FALSE)
 ```
-
 
 
 #### _10. `spfungorum_records`: Retrieve Index Fungorum records for a Brazilian taxon_
@@ -306,22 +310,27 @@ fast_records <- spfungorum_records(taxon = "Phellinotus", rank = "genus",
 ```
 
 
+#### _11. `funga_distribution_gap`: Find candidate new state and phytogeographic domain records_
 
-#### _11. `funga_distribution_gap`: Find candidate new state records_
-
-Given a fungal genus or species, checks GBIF, speciesLink, and the Reflora Virtual Herbarium (via the [`refloraR`](https://github.com/DBOSlab/refloraR) package) for specimen evidence in Brazilian states that are not currently listed in FFB's official distribution for that taxon — flagging candidate new state records. Its HTML report goes one step further than the state-level table, listing the actual **individual occurrence records** behind each new-state candidate, each linking directly to that record's page on GBIF or REFLORA.
+Given a fungal genus or species, checks GBIF and, optionally, speciesLink and the Reflora Virtual Herbarium (via the [`refloraR`](https://github.com/DBOSlab/refloraR) package) for specimen evidence in Brazilian states that are not currently listed in FFB's official distribution for that taxon — flagging candidate new state records. By default (`domains = TRUE`), georeferenced records are also placed in the six Brazilian phytogeographic domains (Amazônia, Caatinga, Cerrado, Mata Atlântica, Pampa, Pantanal) using IBGE's biome map bundled with the package, flagging candidate new **domain** records the same way, and plotted on an interactive map in the HTML report. The function returns a list of three tables — `states`, `domains`, and `records` — and the HTML report lists the actual **individual occurrence records** behind each candidate, each linking directly to that record's page on GBIF or Reflora.
 
 ```r
 library(fungaR)
 
 gap <- funga_distribution_gap(taxon = "Phellinotus piptadeniae")
 
+# Candidate new state records
+gap$states
+
+# Candidate new phytogeographic domain records, and the records behind them
+gap$domains
+gap$records[gap$records$New_domain_record_candidate, ]
+
 # Restrict the check to two states, using only GBIF
 gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
                                     state = c("Minas Gerais", "Pernambuco"),
                                     sources = "gbif")
 ```
-
 
 
 ## Key Features
@@ -332,25 +341,22 @@ gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
 - Name Resolution: Exact and fuzzy matching of your own species lists against the FFB checklist, including synonym resolution
 - Taxonomic Hierarchy: Retrieve child taxa at any rank, from division down to species, on FFB's fungi hierarchy
 - Data Cleaning: Automated parsing and standardization of DwC-A fields
-- Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and Reflora to flag species and state records missing from FFB, or retrieve MycoBank records for a Brazilian taxon directly
+- Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and Reflora to flag species, state, and phytogeographic domain records missing from FFB, or retrieve MycoBank records for a Brazilian taxon directly
+- Phytogeographic Domain Mapping: Place georeferenced occurrence records in Brazil's six phytogeographic domains and flag candidate new domain records, with an interactive map in the `funga_distribution_gap()` HTML report
 - Interactive HTML Reports: `mycobank_gap()`, `mycobank_records()`, and `funga_distribution_gap()` write filterable, downloadable HTML reports alongside their spreadsheet output
 - Tidyverse Integration: Seamless integration with dplyr, tidyr, and other tidyverse packages
-
 
 
 ## Documentation
 Full function documentation and articles are available at the `fungaR` [website](https://dboslab.github.io/fungaR-website/).
 
 
-
 ## Citation
 Cardoso, D., Jordão, L., Rezende, D.H.C., Alves-Silva, G., Martins-da-Cunha, K., Góes-Neto, A., Drechsler-Santos, E.R. 2026. fungaR: Tools for Accessing, Analyzing, and Curating Fungal Data from the Flora e Funga do Brasil Platform. https://github.com/DBOSlab/fungaR
 
 
-
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request or open an issue on [GitHub](https://github.com/DBOSlab/fungaR/issues).
-
 
 
 ## License

@@ -1,28 +1,69 @@
 #' Find candidate new Brazilian state records for a fungal taxon
 #'
 #' @description
-#' Given a fungal genus or species, checks \href{https://www.gbif.org}{GBIF},
-#' \href{https://specieslink.net}{speciesLink}, and (optionally) the
-#' \href{https://ipt.jbrj.gov.br/reflora/}{Reflora Virtual Herbarium} for specimen/occurrence
-#' evidence of the taxon in Brazilian states that are \emph{not} currently listed in its
-#' official Flora e Funga do Brasil (FFB) distribution. This flags candidate new state
-#' records for a taxonomist to manually verify - e.g. a species listed by FFB only for
-#' Bahia, but with specimens indexed from Pernambuco.
+#' Given a fungal genus or species, checks \href{https://www.gbif.org}{GBIF} and,
+#' optionally, \href{https://specieslink.net}{speciesLink} and the
+#' \href{https://ipt.jbrj.gov.br/reflora/}{Reflora Virtual Herbarium} for specimen and
+#' occurrence evidence of the taxon in Brazilian states that are \emph{not} currently
+#' listed in its official Flora e Funga do Brasil (FFB) distribution. This flags
+#' candidate new state records for a taxonomist to verify - e.g. a species listed by FFB
+#' only for Bahia, but with specimens indexed from Pernambuco - so that the
+#' distributions in FFB monographs can be kept complete. Georeferenced records are also
+#' placed in the six Brazilian phytogeographic domains, to flag candidate new domain
+#' records in the same way.
 #'
 #' @details
-#' FFB's own officially-listed states are retrieved the same way \code{\link{funga_records}}
-#' does internally, from the parsed FFB distribution table. Occurrence evidence beyond FFB
-#' comes from up to three independent sources (see \code{sources}): GBIF's public REST API
-#' (no key required, and the most reliable of the three), speciesLink's public web service
-#' (best-effort - see \code{\link{mycobank_gap}}'s Note on its known SSL/endpoint
-#' issues), and the \pkg{refloraR} package's \code{\link[refloraR]{reflora_records}} for
-#' Reflora specimen data (used only if the \pkg{refloraR} package is installed).
+#' \strong{FFB side.} The officially listed states come from the parsed FFB taxon and
+#' distribution tables (the same locally cached dataset as \code{\link{funga_records}}).
+#' For a genus, the states of all its species and infraspecific taxa are combined; for a
+#' species, those of the species and its infraspecific taxa. If the name is a synonym in
+#' FFB, the distribution of its accepted name is used.
+#'
+#' \strong{Occurrence evidence.} Up to three sources can be queried (see
+#' \code{sources}):
+#' \describe{
+#'   \item{\code{"gbif"} (default)}{GBIF's public API. The name is first resolved to
+#'     its GBIF backbone key within the Fungi kingdom only (so a genus name shared with
+#'     a plant, alga, or animal is never confused with the fungal one), so the records
+#'     of its synonyms and infraspecific taxa are included. All states are counted in a
+#'     single request.}
+#'   \item{\code{"reflora"}}{Reflora Virtual Herbarium specimens, via
+#'     \code{\link[refloraR]{reflora_records}} (requires the \pkg{refloraR} package).
+#'     Note that the first use downloads the Reflora herbarium archives - several
+#'     gigabytes - which \pkg{refloraR} then caches for later calls.}
+#'   \item{\code{"speciesLink"}}{speciesLink's API, which requires a free API key
+#'     (\code{specieslink_key}; create one at \url{https://specieslink.net}).}
+#' }
+#' Free-text state values in these sources (e.g. \code{"Ba"}, \code{"Est. do Bahia"},
+#' \code{"Paraiba"}) are normalised to FFB state names before comparison; values that are
+#' not Brazilian states are ignored.
+#'
+#' \strong{Phytogeographic domains.} With \code{domains = TRUE} (default), the GBIF
+#' records that have coordinates - excluding those GBIF flags with geospatial issues,
+#' such as zero coordinates or coordinates outside the stated country - are placed in
+#' the six Brazilian phytogeographic domains (Amazonia, Caatinga, Cerrado, Mata
+#' Atlantica, Pampa, Pantanal) using IBGE's biome map (2019) bundled with fungaR,
+#' simplified to a 1 km tolerance. A domain with records but not listed for the taxon
+#' in FFB is a candidate new domain record. Up to \code{max_coordinates} records are
+#' read (300 per request); Reflora specimens with coordinates are added when
+#' \code{"reflora"} is among \code{sources}. Records that fall outside the six domains
+#' (e.g. just offshore) are kept in \code{records}, with \code{Domain = NA}, but
+#' are never flagged nor drawn on the report's map. This
+#' analysis requires the \pkg{sf} package, and the map in the HTML report the
+#' \pkg{leaflet} package; without them, they are skipped with a message.
+#'
+#' Occurrence records are evidence to review, not proof: a record in a new state may be
+#' a cultivated specimen, a misidentification, or a georeferencing error, which is why
+#' the HTML report lists the individual records behind each candidate state.
 #'
 #' @usage
 #' funga_distribution_gap(
 #'   taxon,
 #'   state = NULL,
-#'   sources = c("gbif", "speciesLink", "reflora"),
+#'   sources = "gbif",
+#'   specieslink_key = Sys.getenv("SPECIESLINK_KEY"),
+#'   domains = TRUE,
+#'   max_coordinates = 5000,
 #'   version = "latest",
 #'   verbose = TRUE,
 #'   save = TRUE,
@@ -37,13 +78,25 @@
 #'
 #' @param state Character vector. Optional subset of Brazilian states (full name or
 #'   acronym) to restrict the check to. \code{NULL} (default) checks all states with any
-#'   evidence from the requested \code{sources}.
+#'   evidence.
 #'
 #' @param sources Character vector. Which occurrence sources to query: any of
-#'   \code{"gbif"}, \code{"speciesLink"}, \code{"reflora"}. Defaults to all three.
+#'   \code{"gbif"}, \code{"reflora"}, \code{"speciesLink"}. Defaults to \code{"gbif"},
+#'   the fastest. See Details for the requirements of the other two.
+#'
+#' @param specieslink_key Character. speciesLink API key, used when
+#'   \code{"speciesLink"} is among \code{sources}. Defaults to the
+#'   \code{SPECIESLINK_KEY} environment variable.
+#'
+#' @param domains Logical. If \code{TRUE} (default), also place the georeferenced
+#'   records in the Brazilian phytogeographic domains and flag candidate new domain
+#'   records (see Details). Requires the \pkg{sf} package.
+#'
+#' @param max_coordinates Numeric. Maximum number of georeferenced GBIF records read
+#'   for the domain analysis. Defaults to \code{5000}.
 #'
 #' @param version Character. FFB dataset version to compare against. Defaults to
-#'   \code{"latest"}. Passed to \code{\link{funga_records}}.
+#'   \code{"latest"}. Passed to \code{\link{funga_download}}.
 #'
 #' @param verbose Logical. If \code{TRUE} (default), prints progress messages.
 #'
@@ -58,48 +111,61 @@
 #'
 #' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
 #'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
-#'   evidence-by-source breakdown, the full state-by-state table, and the individual
-#'   occurrence records (not aggregated) found in the new-state-record candidate states -
-#'   each linking out to the specific record in its source database (GBIF occurrence page
-#'   or Reflora specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
-#'   to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown}, \pkg{DT}, and
-#'   \pkg{htmltools} packages; if any is missing, the report is skipped with a message
-#'   (the \code{.xlsx} spreadsheet is unaffected).
+#'   evidence-by-source breakdown, the full state-by-state table, the domain table, an
+#'   interactive map of the georeferenced records over the phytogeographic domains
+#'   (coloured by candidate status), the records in candidate domains, and the individual
+#'   occurrence records found in the new-state-record candidate states - each linking to
+#'   the record in its source database - all as sortable, filterable \pkg{DT} widgets with
+#'   buttons to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown},
+#'   \pkg{DT}, and \pkg{htmltools} packages; if any is missing, the report is skipped with
+#'   a message (the \code{.xlsx} spreadsheet is unaffected).
 #'
 #' @param open_report Logical. If \code{TRUE} (default in interactive sessions), opens
-#'   the rendered HTML report in the default browser.
+#'   the HTML report in the browser once rendered.
 #'
-#' @return A \code{data.frame}, one row per Brazilian state with any occurrence evidence
-#'   for \code{taxon}, with columns:
+#' @return A list of three \code{data.frame}s:
 #' \describe{
-#'   \item{Taxon}{The queried taxon name.}
-#'   \item{State}{Brazilian state name.}
-#'   \item{In_FFB_distribution}{Logical; whether FFB already lists this state for the taxon.}
-#'   \item{GBIF_records}{Number of Brazil GBIF occurrence records in this state (when
-#'     \code{"gbif" \%in\% sources}).}
-#'   \item{speciesLink_evidence}{Logical; whether speciesLink reported this state
-#'     (best-effort, see Details).}
-#'   \item{Reflora_records}{Number of Reflora specimen records in this state (when
-#'     \code{"reflora" \%in\% sources} and \pkg{refloraR} is installed).}
-#'   \item{New_state_record_candidate}{\code{TRUE} when the state has evidence from at
-#'     least one external source but is \emph{not} in \code{In_FFB_distribution} - i.e. a
-#'     candidate worth manual taxonomic review.}
+#'   \item{\code{states}}{One row per Brazilian state with any evidence for
+#'     \code{taxon} (in FFB or in the queried sources): \code{Taxon}, \code{State},
+#'     \code{In_FFB_distribution} (whether FFB already lists the state),
+#'     \code{GBIF_records}, \code{Reflora_records}, and \code{speciesLink_records}
+#'     (records in the state, for each source queried), and
+#'     \code{New_state_record_candidate} (\code{TRUE} when the state has evidence from
+#'     at least one source but is not in FFB's distribution).}
+#'   \item{\code{domains}}{One row per phytogeographic domain with evidence (in FFB or
+#'     among the georeferenced records): \code{Taxon}, \code{Domain},
+#'     \code{In_FFB_distribution}, \code{Georeferenced_records}, and
+#'     \code{New_domain_record_candidate}. Empty when \code{domains = FALSE}.}
+#'   \item{\code{records}}{One row per georeferenced record, with its coordinates,
+#'     \code{State}, \code{Domain}, collector, date, institution, catalogue number,
+#'     identification, a link to the record, and the logical columns
+#'     \code{New_state_record_candidate} and \code{New_domain_record_candidate}. Empty
+#'     when \code{domains = FALSE}.}
 #' }
+#' With \code{save = TRUE}, each table is saved as a sheet of the \code{.xlsx}
+#' spreadsheet.
 #'
-#' @seealso \code{\link{mycobank_gap}}, \code{\link{mycobank_records}},
-#'   \code{\link{funga_records}}
+#' @seealso \code{\link{mycobank_gap}}, \code{\link{funga_records}}
 #'
 #' @author
 #' Domingos Cardoso
 #'
 #' @examples
 #' \dontrun{
+#' # Candidate new state records for a species
 #' gap <- funga_distribution_gap(taxon = "Trichoderma harzianum")
 #'
-#' # Restrict the check to two states, using only GBIF
-#' gap_ba_pe <- funga_distribution_gap(taxon = "Trichoderma harzianum",
-#'                                     state = c("Bahia", "Pernambuco"),
-#'                                     sources = "gbif")
+#' # A whole genus, restricted to two states
+#' gap_ne <- funga_distribution_gap(taxon = "Trichoderma",
+#'                                  state = c("Pernambuco", "Paraiba"))
+#'
+#' # The candidate new phytogeographic domains, and the records behind them
+#' gap$domains
+#' gap$records[gap$records$New_domain_record_candidate, ]
+#'
+#' # Adding Reflora herbarium specimens (requires refloraR)
+#' gap_reflora <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+#'                                       sources = c("gbif", "reflora"))
 #' }
 #'
 #' @importFrom openxlsx write.xlsx
@@ -108,7 +174,10 @@
 
 funga_distribution_gap <- function(taxon,
                                    state = NULL,
-                                   sources = c("gbif", "speciesLink", "reflora"),
+                                   sources = "gbif",
+                                   specieslink_key = Sys.getenv("SPECIESLINK_KEY"),
+                                   domains = TRUE,
+                                   max_coordinates = 5000,
                                    version = "latest",
                                    verbose = TRUE,
                                    save = TRUE,
@@ -121,63 +190,81 @@ funga_distribution_gap <- function(taxon,
     stop("'taxon' must be a single character string (one genus or species name).",
          call. = FALSE)
   }
-  sources <- match.arg(sources, c("gbif", "speciesLink", "reflora"), several.ok = TRUE)
-  taxon <- trimws(taxon)
+  sources <- match.arg(sources, c("gbif", "reflora", "speciesLink"), several.ok = TRUE)
+  taxon <- trimws(gsub("\\s+", " ", taxon))
 
   if (is.null(filename)) {
     filename <- paste0("funga_distribution_gap_", gsub("\\s+", "_", taxon))
   }
 
   # ------------------------------------------------------------------------
-  # 1. FFB's officially-listed states for this taxon
+  # 1. FFB's officially listed states for this taxon
   # ------------------------------------------------------------------------
   if (verbose) message("Retrieving FFB's officially listed states for '", taxon, "'...")
 
   ffb <- .funga_prepare_records(version = version, verbose = FALSE, rm_funga_database = FALSE)
-  taxon_ids <- ffb$taxon_df$id[ffb$taxon_df$taxonName %in% taxon]
+  ffb_taxon <- .ffb_taxon_states(taxon, ffb$taxon_df, ffb$distribution_df)
+  ffb_states <- ffb_taxon$states
+  ffb_domains <- ffb_taxon$domains
 
-  ffb_states <- character(0)
-  if (length(taxon_ids) > 0) {
-    abbrev <- gsub("^BR-", "", ffb$distribution_df$locationID[ffb$distribution_df$id %in% taxon_ids])
-    abbrev <- abbrev[!is.na(abbrev) & nzchar(abbrev)]
-    if (length(abbrev) > 0) ffb_states <- unique(.arg_check_state(abbrev, return_abbrev = FALSE))
-  } else if (verbose) {
-    message("  '", taxon, "' was not found in the current FFB checklist ",
-           "(treating FFB's officially listed states as empty).")
+  if (verbose) {
+    if (!ffb_taxon$found) {
+      message("  '", taxon, "' was not found in the current FFB checklist ",
+              "(treating FFB's officially listed states as empty).")
+    } else {
+      if (ffb_taxon$name != taxon) {
+        message("  '", taxon, "' is a synonym in FFB; using the distribution of its ",
+                "accepted name, '", ffb_taxon$name, "'.")
+      }
+      if (length(ffb_states) == 0) {
+        message("  FFB lists no Brazilian state for '", ffb_taxon$name, "', so every ",
+                "state with records will be flagged.")
+      } else {
+        message("  FFB lists ", length(ffb_states), " state(s).")
+      }
+    }
   }
 
   # ------------------------------------------------------------------------
-  # 2. External occurrence evidence, one source at a time
+  # 2. Occurrence evidence, one source at a time
   # ------------------------------------------------------------------------
-  gbif_states_df <- data.frame(State = character(0), GBIF_records = integer(0))
+  gbif_df <- data.frame(State = character(0), GBIF_records = integer(0), stringsAsFactors = FALSE)
+  gbif_key <- NULL
+  gbif_raw <- list()
   if ("gbif" %in% sources) {
-    if (verbose) message("Querying GBIF for Brazil occurrence records...")
-    gbif <- .gbif_brazil_occurrence(taxon)
-    if (nrow(gbif$state_counts) > 0) {
-      gbif_states_df <- data.frame(State = .arg_check_state(gbif$state_counts$state),
-                                   GBIF_records = gbif$state_counts$count,
-                                   stringsAsFactors = FALSE)
+    if (verbose) message("Querying GBIF for Brazilian occurrence records...")
+    gbif_key <- .gbif_fungi_key(taxon)
+    if (is.null(gbif_key)) {
+      if (verbose) message("  '", taxon, "' was not found in GBIF among Fungi; ",
+                           "skipping GBIF.")
+    } else {
+      gbif <- .gbif_brazil_state_counts(gbif_key$key)
+      if (is.null(gbif)) {
+        if (verbose) message("  The GBIF request failed; skipping GBIF.")
+      } else {
+        gbif_df <- gbif$state_counts
+        gbif_raw <- gbif$raw_states
+        if (verbose) {
+          message("  ", gbif$n_records, " Brazilian record(s) in ", nrow(gbif_df), " state(s).")
+        }
+      }
     }
   }
 
-  splink_states <- character(0)
-  if ("speciesLink" %in% sources) {
-    if (verbose) message("Querying speciesLink for Brazil occurrence records (best-effort)...")
-    splink <- .splink_brazil_occurrence(taxon)
-    if (!is.na(splink$states) && nzchar(splink$states)) {
-      splink_states <- .arg_check_state(trimws(strsplit(splink$states, ";")[[1]]))
-    }
-  }
-
-  reflora_states_df <- data.frame(State = character(0), Reflora_records = integer(0))
+  reflora_df <- data.frame(State = character(0), Reflora_records = integer(0),
+                           stringsAsFactors = FALSE)
+  reflora_result <- NULL
   if ("reflora" %in% sources) {
     if (!requireNamespace("refloraR", quietly = TRUE)) {
       if (verbose) {
-        message("  Package 'refloraR' is not installed; skipping Reflora evidence. ",
-               "Install it with install.packages('refloraR') to include this source.")
+        message("  Package 'refloraR' is not installed; skipping Reflora. Install it ",
+                "with remotes::install_github('DBOSlab/refloraR') to include this source.")
       }
     } else {
-      if (verbose) message("Querying Reflora specimen records (via refloraR)...")
+      if (verbose) {
+        message("Querying Reflora herbarium specimens (via refloraR; the first use ",
+                "downloads the Reflora archives)...")
+      }
       reflora_result <- tryCatch({
         refloraR::reflora_records(taxon = taxon, verbose = FALSE, save = FALSE)
       }, error = function(e) {
@@ -186,126 +273,209 @@ funga_distribution_gap <- function(taxon,
       })
       if (!is.null(reflora_result) && nrow(reflora_result) > 0 &&
           "stateProvince" %in% names(reflora_result)) {
-        tab <- table(.arg_check_state(stats::na.omit(reflora_result$stateProvince)))
-        reflora_states_df <- data.frame(State = names(tab), Reflora_records = as.integer(tab),
-                                        stringsAsFactors = FALSE)
+        st <- .normalize_br_state(reflora_result$stateProvince)
+        st <- st[!is.na(st)]
+        if (length(st) > 0) {
+          tab <- table(st)
+          reflora_df <- data.frame(State = names(tab), Reflora_records = as.integer(tab),
+                                   stringsAsFactors = FALSE)
+        }
+      }
+    }
+  }
+
+  splink_df <- data.frame(State = character(0), speciesLink_records = integer(0),
+                          stringsAsFactors = FALSE)
+  if ("speciesLink" %in% sources) {
+    if (is.null(specieslink_key) || !nzchar(specieslink_key)) {
+      if (verbose) {
+        message("  No speciesLink API key given; skipping speciesLink. Create a free key ",
+                "at https://specieslink.net and pass it as 'specieslink_key' or set the ",
+                "SPECIESLINK_KEY environment variable.")
+      }
+    } else {
+      if (verbose) message("Querying speciesLink for Brazilian records...")
+      splink <- .splink_brazil_state_counts(taxon, specieslink_key)
+      if (is.null(splink)) {
+        if (verbose) message("  The speciesLink request failed; skipping speciesLink.")
+      } else {
+        splink_df <- splink
       }
     }
   }
 
   # ------------------------------------------------------------------------
-  # 3. Assemble one row per state with ANY evidence (FFB or external)
+  # 3. One row per state with ANY evidence (FFB or external)
   # ------------------------------------------------------------------------
-  all_states <- unique(c(ffb_states, gbif_states_df$State, splink_states, reflora_states_df$State))
+  all_states <- unique(c(ffb_states, gbif_df$State, reflora_df$State, splink_df$State))
 
   if (!is.null(state)) {
-    requested <- .arg_check_state(state)
+    requested <- .normalize_br_state(state)
+    if (any(is.na(requested))) {
+      stop("Unrecognised Brazilian state(s) in 'state': ",
+           paste(state[is.na(requested)], collapse = ", "), call. = FALSE)
+    }
     all_states <- intersect(all_states, requested)
   }
 
+  empty <- data.frame(Taxon = character(0), State = character(0),
+                      In_FFB_distribution = logical(0),
+                      New_state_record_candidate = logical(0), stringsAsFactors = FALSE)
   if (length(all_states) == 0) {
-    if (verbose) message("\nNo occurrence evidence found for '", taxon, "' from the requested sources.")
-    result <- data.frame(Taxon = character(0), State = character(0),
-                         In_FFB_distribution = logical(0),
-                         New_state_record_candidate = logical(0),
-                         stringsAsFactors = FALSE)
-    return(result)
+    if (verbose) message("\nNo evidence found for '", taxon, "' in the requested states or sources.")
+    return(list(states = empty, domains = .empty_domain_table(), records = .empty_coord_records()))
   }
 
-  result <- data.frame(
-    Taxon = taxon,
-    State = sort(all_states),
-    stringsAsFactors = FALSE
-  )
+  result <- data.frame(Taxon = taxon, State = sort(all_states), stringsAsFactors = FALSE)
   result$In_FFB_distribution <- result$State %in% ffb_states
-
-  if ("gbif" %in% sources) {
-    result$GBIF_records <- gbif_states_df$GBIF_records[match(result$State, gbif_states_df$State)]
+  fill <- function(df, col) {
+    v <- df[[col]][match(result$State, df$State)]
+    v[is.na(v)] <- 0L
+    v
   }
+  if ("gbif" %in% sources) result$GBIF_records <- fill(gbif_df, "GBIF_records")
+  if ("reflora" %in% sources) result$Reflora_records <- fill(reflora_df, "Reflora_records")
   if ("speciesLink" %in% sources) {
-    result$speciesLink_evidence <- result$State %in% splink_states
-  }
-  if ("reflora" %in% sources) {
-    result$Reflora_records <- reflora_states_df$Reflora_records[match(result$State, reflora_states_df$State)]
+    result$speciesLink_records <- fill(splink_df, "speciesLink_records")
   }
 
-  result$New_state_record_candidate <- !result$In_FFB_distribution
-
+  external <- unique(c(gbif_df$State, reflora_df$State, splink_df$State))
+  result$New_state_record_candidate <- !result$In_FFB_distribution & result$State %in% external
   rownames(result) <- NULL
 
+  n_new <- sum(result$New_state_record_candidate)
+
+  # ------------------------------------------------------------------------
+  # 4. Phytogeographic domains, from georeferenced records placed on IBGE's
+  #    biome map
+  # ------------------------------------------------------------------------
+  domain_table <- .empty_domain_table()
+  coord_records <- .empty_coord_records()
+  if (domains) {
+    if (!requireNamespace("sf", quietly = TRUE)) {
+      if (verbose) {
+        message("  Package 'sf' is not installed; skipping the phytogeographic domain ",
+                "analysis. Install it with install.packages('sf') to include it.")
+      }
+    } else {
+      coords <- .empty_coord_records()[, character(0)]
+      if (!is.null(gbif_key)) {
+        if (verbose) message("Placing georeferenced GBIF records in phytogeographic domains...")
+        g <- .gbif_brazil_coordinates(gbif_key$key, max_records = max_coordinates)
+        if (nrow(g) > 0) coords <- cbind(data.frame(Source = "GBIF", stringsAsFactors = FALSE), g)
+      }
+      if (!is.null(reflora_result) && nrow(reflora_result) > 0 &&
+          all(c("decimalLatitude", "decimalLongitude") %in% names(reflora_result))) {
+        rc <- reflora_result
+        col <- function(nm) if (nm %in% names(rc)) as.character(rc[[nm]]) else NA_character_
+        reflora_coords <- data.frame(
+          Source = "Reflora",
+          Latitude = suppressWarnings(as.numeric(rc$decimalLatitude)),
+          Longitude = suppressWarnings(as.numeric(rc$decimalLongitude)),
+          StateProvince = col("stateProvince"), Municipality = col("municipality"),
+          Locality = col("locality"), RecordedBy = col("recordedBy"),
+          RecordNumber = col("recordNumber"), EventDate = col("year"),
+          Institution = col("herbarium"), CatalogNumber = col("catalogNumber"),
+          Identified_as = col("scientificName"), RecordLink = col("bibliographicCitation"),
+          stringsAsFactors = FALSE)
+        reflora_coords <- reflora_coords[!is.na(reflora_coords$Latitude) &
+                                           !is.na(reflora_coords$Longitude), ]
+        coords <- if (ncol(coords) == 0) reflora_coords else rbind(coords, reflora_coords)
+      }
+
+      if (ncol(coords) > 0 && nrow(coords) > 0) {
+        coords$State <- .normalize_br_state(coords$StateProvince)
+        coords$Domain <- .assign_br_domain(coords$Longitude, coords$Latitude)
+        coords$StateProvince <- NULL
+        if (!is.null(state)) coords <- coords[coords$State %in% all_states, ]
+        coords$New_state_record_candidate <- !is.na(coords$State) & !coords$State %in% ffb_states
+        coords$New_domain_record_candidate <- !is.na(coords$Domain) & !coords$Domain %in% ffb_domains
+        coord_records <- cbind(data.frame(Taxon = rep(taxon, nrow(coords)), stringsAsFactors = FALSE),
+                               coords[, setdiff(names(.empty_coord_records()), "Taxon")])
+        rownames(coord_records) <- NULL
+      }
+
+      in_records <- coord_records$Domain[!is.na(coord_records$Domain)]
+      all_domains <- .br_domain_names[.br_domain_names %in% c(ffb_domains, in_records)]
+      if (length(all_domains) > 0) {
+        n_rec <- table(factor(in_records, levels = .br_domain_names))
+        domain_table <- data.frame(
+          Taxon = taxon, Domain = all_domains,
+          In_FFB_distribution = all_domains %in% ffb_domains,
+          Georeferenced_records = as.integer(n_rec[all_domains]),
+          stringsAsFactors = FALSE)
+        domain_table$New_domain_record_candidate <- !domain_table$In_FFB_distribution &
+          domain_table$Georeferenced_records > 0
+      }
+      if (verbose) {
+        message(sprintf("  %d georeferenced record(s); %d of them in a domain not listed by FFB.",
+                        nrow(coord_records), sum(coord_records$New_domain_record_candidate)))
+      }
+    }
+  }
+
+  n_new_domains <- sum(domain_table$New_domain_record_candidate)
   if (verbose) {
-    n_new <- sum(result$New_state_record_candidate)
-    message(sprintf("\n\u2713 %d state(s) with occurrence evidence for '%s', %d not yet in FFB's distribution",
+    message(sprintf("\n\u2713 %d state(s) with evidence for '%s', %d not yet in FFB's distribution",
                     nrow(result), taxon, n_new))
+    if (domains && nrow(domain_table) > 0) {
+      message(sprintf("\u2713 %d phytogeographic domain(s) with evidence, %d not yet in FFB's distribution",
+                      nrow(domain_table), n_new_domains))
+    }
   }
 
-  if (save && nrow(result) > 0) {
+  out <- list(states = result, domains = domain_table, records = coord_records)
+
+  if (save) {
     dir <- .arg_check_dir(dir)
-    .save_xlsx(result, verbose = verbose, filename = filename, dir = dir)
+    .save_xlsx(out, verbose = verbose, filename = filename, dir = dir)
   }
 
-  if (html_report && nrow(result) > 0) {
+  if (html_report) {
     source_summary <- data.frame(
-      source = c("FFB (official)", "GBIF", "speciesLink", "Reflora"),
-      n_states = c(
-        length(ffb_states),
-        if ("gbif" %in% sources) nrow(gbif_states_df) else NA_integer_,
-        if ("speciesLink" %in% sources) length(splink_states) else NA_integer_,
-        if ("reflora" %in% sources) nrow(reflora_states_df) else NA_integer_
-      ),
+      Source = c("FFB (official)", "GBIF", "Reflora", "speciesLink"),
+      States = c(length(ffb_states), nrow(gbif_df), nrow(reflora_df), nrow(splink_df)),
+      Records = c(NA_integer_, sum(gbif_df$GBIF_records), sum(reflora_df$Reflora_records),
+                  sum(splink_df$speciesLink_records)),
       stringsAsFactors = FALSE
     )
-    source_summary <- source_summary[!is.na(source_summary$n_states), ]
+    source_summary <- source_summary[c(TRUE, c("gbif", "reflora", "speciesLink") %in% sources), ]
 
-    # ---- Individual occurrence records backing the new-state-record
-    # candidates (not just the state-level counts above), each linking out to
-    # the specific record in its source database. Capped to a sensible number
-    # of states so this stays fast even for widespread taxa.
-    candidate_states <- result$State[result$New_state_record_candidate]
-    candidate_states <- utils::head(candidate_states, 20)
+    # ---- Individual records behind each new-state-record candidate, each
+    # linking to the record itself in its source database
+    candidates <- result$State[result$New_state_record_candidate]
     records_detail <- data.frame(Source = character(0), State = character(0),
                                  Municipality = character(0), Locality = character(0),
-                                 RecordedBy = character(0), EventDate = character(0),
-                                 Institution = character(0), CatalogNumber = character(0),
+                                 RecordedBy = character(0), RecordNumber = character(0),
+                                 EventDate = character(0), Institution = character(0),
+                                 CatalogNumber = character(0), Identified_as = character(0),
                                  RecordLink = character(0), stringsAsFactors = FALSE)
 
-    if ("gbif" %in% sources && length(candidate_states) > 0) {
-      if (verbose) message("Fetching individual GBIF records for the new-state candidates...")
-      for (st in candidate_states) {
-        recs <- .gbif_brazil_state_records(taxon, st)
+    if (!is.null(gbif_key) && length(candidates) > 0) {
+      if (verbose) message("Fetching the GBIF records behind the new-state candidates...")
+      for (st in candidates) {
+        recs <- .gbif_brazil_state_records(gbif_key$key, gbif_raw[[st]])
         if (nrow(recs) > 0) {
-          records_detail <- rbind(records_detail, data.frame(
-            Source = "GBIF",
-            State = st,
-            Municipality = recs$municipality,
-            Locality = recs$locality,
-            RecordedBy = recs$recordedBy,
-            EventDate = recs$eventDate,
-            Institution = ifelse(!is.na(recs$institutionCode), recs$institutionCode, recs$collectionCode),
-            CatalogNumber = recs$catalogNumber,
-            RecordLink = recs$GBIF_URL,
-            stringsAsFactors = FALSE
-          ))
+          records_detail <- rbind(records_detail,
+                                  cbind(data.frame(Source = "GBIF", State = st,
+                                                   stringsAsFactors = FALSE), recs))
         }
       }
     }
 
-    if ("reflora" %in% sources && length(candidate_states) > 0 &&
-        exists("reflora_result", inherits = FALSE) && !is.null(reflora_result) &&
-        nrow(reflora_result) > 0 && "stateProvince" %in% names(reflora_result)) {
-      reflora_norm_state <- .arg_check_state(reflora_result$stateProvince)
-      reflora_cand <- reflora_result[reflora_norm_state %in% candidate_states, , drop = FALSE]
-      if (nrow(reflora_cand) > 0) {
-        col <- function(nm) if (nm %in% names(reflora_cand)) reflora_cand[[nm]] else NA
+    if (!is.null(reflora_result) && nrow(reflora_result) > 0 && length(candidates) > 0 &&
+        "stateProvince" %in% names(reflora_result)) {
+      st <- .normalize_br_state(reflora_result$stateProvince)
+      rc <- reflora_result[st %in% candidates, , drop = FALSE]
+      if (nrow(rc) > 0) {
+        col <- function(nm) if (nm %in% names(rc)) as.character(rc[[nm]]) else NA_character_
         records_detail <- rbind(records_detail, data.frame(
           Source = "Reflora",
-          State = .arg_check_state(reflora_cand$stateProvince),
-          Municipality = col("municipality"),
-          Locality = col("locality"),
-          RecordedBy = col("recordedBy"),
-          EventDate = if ("year" %in% names(reflora_cand)) as.character(col("year")) else NA_character_,
-          Institution = col("herbarium"),
-          CatalogNumber = col("recordNumber"),
+          State = .normalize_br_state(rc$stateProvince),
+          Municipality = col("municipality"), Locality = col("locality"),
+          RecordedBy = col("recordedBy"), RecordNumber = col("recordNumber"),
+          EventDate = col("year"), Institution = col("herbarium"),
+          CatalogNumber = col("catalogNumber"), Identified_as = col("scientificName"),
           RecordLink = col("bibliographicCitation"),
           stringsAsFactors = FALSE
         ))
@@ -314,12 +484,21 @@ funga_distribution_gap <- function(taxon,
 
     report_data <- list(
       taxon = taxon,
+      ffb_name = ffb_taxon$name,
+      ffb_found = ffb_taxon$found,
+      gbif_name = if (is.null(gbif_key)) NA_character_ else gbif_key$name,
       n_in_ffb = length(ffb_states),
       n_states_total = nrow(result),
-      n_new_candidates = sum(result$New_state_record_candidate),
+      n_new_candidates = n_new,
       source_summary = source_summary,
       result = result,
-      records_detail = records_detail
+      records_detail = records_detail,
+      domains_run = domains && requireNamespace("sf", quietly = TRUE),
+      ffb_domains = ffb_domains,
+      domain_table = domain_table,
+      n_new_domains = n_new_domains,
+      coord_records = coord_records,
+      max_coordinates = max_coordinates
     )
 
     dir <- .arg_check_dir(dir)
@@ -332,5 +511,23 @@ funga_distribution_gap <- function(taxon,
                          open_report = open_report)
   }
 
-  return(result)
+  return(out)
+}
+
+
+# Empty result tables, with the columns funga_distribution_gap() returns
+.empty_domain_table <- function() {
+  data.frame(Taxon = character(0), Domain = character(0), In_FFB_distribution = logical(0),
+             Georeferenced_records = integer(0), New_domain_record_candidate = logical(0),
+             stringsAsFactors = FALSE)
+}
+
+.empty_coord_records <- function() {
+  data.frame(Taxon = character(0), Source = character(0), Latitude = numeric(0),
+             Longitude = numeric(0), State = character(0), Domain = character(0),
+             Municipality = character(0), Locality = character(0), RecordedBy = character(0),
+             RecordNumber = character(0), EventDate = character(0), Institution = character(0),
+             CatalogNumber = character(0), Identified_as = character(0),
+             RecordLink = character(0), New_state_record_candidate = logical(0),
+             New_domain_record_candidate = logical(0), stringsAsFactors = FALSE)
 }

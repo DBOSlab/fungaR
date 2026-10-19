@@ -7,7 +7,10 @@
 funga_distribution_gap(
   taxon,
   state = NULL,
-  sources = c("gbif", "speciesLink", "reflora"),
+  sources = "gbif",
+  specieslink_key = Sys.getenv("SPECIESLINK_KEY"),
+  domains = TRUE,
+  max_coordinates = 5000,
   version = "latest",
   verbose = TRUE,
   save = TRUE,
@@ -23,13 +26,25 @@ funga_distribution_gap(
 
 \item{state}{Character vector. Optional subset of Brazilian states (full name or
 acronym) to restrict the check to. \code{NULL} (default) checks all states with any
-evidence from the requested \code{sources}.}
+evidence.}
 
 \item{sources}{Character vector. Which occurrence sources to query: any of
-\code{"gbif"}, \code{"speciesLink"}, \code{"reflora"}. Defaults to all three.}
+\code{"gbif"}, \code{"reflora"}, \code{"speciesLink"}. Defaults to \code{"gbif"},
+the fastest. See Details for the requirements of the other two.}
+
+\item{specieslink_key}{Character. speciesLink API key, used when
+\code{"speciesLink"} is among \code{sources}. Defaults to the
+\code{SPECIESLINK_KEY} environment variable.}
+
+\item{domains}{Logical. If \code{TRUE} (default), also place the georeferenced
+records in the Brazilian phytogeographic domains and flag candidate new domain
+records (see Details). Requires the \pkg{sf} package.}
+
+\item{max_coordinates}{Numeric. Maximum number of georeferenced GBIF records read
+for the domain analysis. Defaults to \code{5000}.}
 
 \item{version}{Character. FFB dataset version to compare against. Defaults to
-\code{"latest"}. Passed to \code{\link{funga_records}}.}
+\code{"latest"}. Passed to \code{\link{funga_download}}.}
 
 \item{verbose}{Logical. If \code{TRUE} (default), prints progress messages.}
 
@@ -44,67 +59,118 @@ Defaults to \code{"funga_distribution_gap_<taxon>"}.}
 
 \item{html_report}{Logical. If \code{TRUE} (default), also writes a self-contained
 HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
-evidence-by-source breakdown, the full state-by-state table, and the individual
-occurrence records (not aggregated) found in the new-state-record candidate states -
-each linking out to the specific record in its source database (GBIF occurrence page
-or Reflora specimen page) - all as sortable, filterable \pkg{DT} widgets with buttons
-to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown}, \pkg{DT}, and
-\pkg{htmltools} packages; if any is missing, the report is skipped with a message
-(the \code{.xlsx} spreadsheet is unaffected).}
+evidence-by-source breakdown, the full state-by-state table, the domain table, an
+interactive map of the georeferenced records over the phytogeographic domains
+(coloured by candidate status), the records in candidate domains, and the individual
+occurrence records found in the new-state-record candidate states - each linking to
+the record in its source database - all as sortable, filterable \pkg{DT} widgets with
+buttons to copy or download them as CSV/Excel. Requires the \pkg{rmarkdown},
+\pkg{DT}, and \pkg{htmltools} packages; if any is missing, the report is skipped with
+a message (the \code{.xlsx} spreadsheet is unaffected).}
 
 \item{open_report}{Logical. If \code{TRUE} (default in interactive sessions), opens
-the rendered HTML report in the default browser.}
+the HTML report in the browser once rendered.}
 }
 \value{
-A \code{data.frame}, one row per Brazilian state with any occurrence evidence
-  for \code{taxon}, with columns:
+A list of three \code{data.frame}s:
 \describe{
-  \item{Taxon}{The queried taxon name.}
-  \item{State}{Brazilian state name.}
-  \item{In_FFB_distribution}{Logical; whether FFB already lists this state for the taxon.}
-  \item{GBIF_records}{Number of Brazil GBIF occurrence records in this state (when
-    \code{"gbif" \%in\% sources}).}
-  \item{speciesLink_evidence}{Logical; whether speciesLink reported this state
-    (best-effort, see Details).}
-  \item{Reflora_records}{Number of Reflora specimen records in this state (when
-    \code{"reflora" \%in\% sources} and \pkg{refloraR} is installed).}
-  \item{New_state_record_candidate}{\code{TRUE} when the state has evidence from at
-    least one external source but is \emph{not} in \code{In_FFB_distribution} - i.e. a
-    candidate worth manual taxonomic review.}
+  \item{\code{states}}{One row per Brazilian state with any evidence for
+    \code{taxon} (in FFB or in the queried sources): \code{Taxon}, \code{State},
+    \code{In_FFB_distribution} (whether FFB already lists the state),
+    \code{GBIF_records}, \code{Reflora_records}, and \code{speciesLink_records}
+    (records in the state, for each source queried), and
+    \code{New_state_record_candidate} (\code{TRUE} when the state has evidence from
+    at least one source but is not in FFB's distribution).}
+  \item{\code{domains}}{One row per phytogeographic domain with evidence (in FFB or
+    among the georeferenced records): \code{Taxon}, \code{Domain},
+    \code{In_FFB_distribution}, \code{Georeferenced_records}, and
+    \code{New_domain_record_candidate}. Empty when \code{domains = FALSE}.}
+  \item{\code{records}}{One row per georeferenced record, with its coordinates,
+    \code{State}, \code{Domain}, collector, date, institution, catalogue number,
+    identification, a link to the record, and the logical columns
+    \code{New_state_record_candidate} and \code{New_domain_record_candidate}. Empty
+    when \code{domains = FALSE}.}
 }
+With \code{save = TRUE}, each table is saved as a sheet of the \code{.xlsx}
+spreadsheet.
 }
 \description{
-Given a fungal genus or species, checks \href{https://www.gbif.org}{GBIF},
-\href{https://specieslink.net}{speciesLink}, and (optionally) the
-\href{https://ipt.jbrj.gov.br/reflora/}{Reflora Virtual Herbarium} for specimen/occurrence
-evidence of the taxon in Brazilian states that are \emph{not} currently listed in its
-official Flora e Funga do Brasil (FFB) distribution. This flags candidate new state
-records for a taxonomist to manually verify - e.g. a species listed by FFB only for
-Bahia, but with specimens indexed from Pernambuco.
+Given a fungal genus or species, checks \href{https://www.gbif.org}{GBIF} and,
+optionally, \href{https://specieslink.net}{speciesLink} and the
+\href{https://ipt.jbrj.gov.br/reflora/}{Reflora Virtual Herbarium} for specimen and
+occurrence evidence of the taxon in Brazilian states that are \emph{not} currently
+listed in its official Flora e Funga do Brasil (FFB) distribution. This flags
+candidate new state records for a taxonomist to verify - e.g. a species listed by FFB
+only for Bahia, but with specimens indexed from Pernambuco - so that the
+distributions in FFB monographs can be kept complete. Georeferenced records are also
+placed in the six Brazilian phytogeographic domains, to flag candidate new domain
+records in the same way.
 }
 \details{
-FFB's own officially-listed states are retrieved the same way \code{\link{funga_records}}
-does internally, from the parsed FFB distribution table. Occurrence evidence beyond FFB
-comes from up to three independent sources (see \code{sources}): GBIF's public REST API
-(no key required, and the most reliable of the three), speciesLink's public web service
-(best-effort - see \code{\link{mycobank_gap}}'s Note on its known SSL/endpoint
-issues), and the \pkg{refloraR} package's \code{\link[refloraR]{reflora_records}} for
-Reflora specimen data (used only if the \pkg{refloraR} package is installed).
+\strong{FFB side.} The officially listed states come from the parsed FFB taxon and
+distribution tables (the same locally cached dataset as \code{\link{funga_records}}).
+For a genus, the states of all its species and infraspecific taxa are combined; for a
+species, those of the species and its infraspecific taxa. If the name is a synonym in
+FFB, the distribution of its accepted name is used.
+
+\strong{Occurrence evidence.} Up to three sources can be queried (see
+\code{sources}):
+\describe{
+  \item{\code{"gbif"} (default)}{GBIF's public API. The name is first resolved to
+    its GBIF backbone key within the Fungi kingdom only (so a genus name shared with
+    a plant, alga, or animal is never confused with the fungal one), so the records
+    of its synonyms and infraspecific taxa are included. All states are counted in a
+    single request.}
+  \item{\code{"reflora"}}{Reflora Virtual Herbarium specimens, via
+    \code{\link[refloraR]{reflora_records}} (requires the \pkg{refloraR} package).
+    Note that the first use downloads the Reflora herbarium archives - several
+    gigabytes - which \pkg{refloraR} then caches for later calls.}
+  \item{\code{"speciesLink"}}{speciesLink's API, which requires a free API key
+    (\code{specieslink_key}; create one at \url{https://specieslink.net}).}
+}
+Free-text state values in these sources (e.g. \code{"Ba"}, \code{"Est. do Bahia"},
+\code{"Paraiba"}) are normalised to FFB state names before comparison; values that are
+not Brazilian states are ignored.
+
+\strong{Phytogeographic domains.} With \code{domains = TRUE} (default), the GBIF
+records that have coordinates - excluding those GBIF flags with geospatial issues,
+such as zero coordinates or coordinates outside the stated country - are placed in
+the six Brazilian phytogeographic domains (Amazonia, Caatinga, Cerrado, Mata
+Atlantica, Pampa, Pantanal) using IBGE's biome map (2019) bundled with fungaR,
+simplified to a 1 km tolerance. A domain with records but not listed for the taxon
+in FFB is a candidate new domain record. Up to \code{max_coordinates} records are
+read (300 per request); Reflora specimens with coordinates are added when
+\code{"reflora"} is among \code{sources}. Records that fall outside the six domains
+(e.g. just offshore) are kept in \code{records}, with \code{Domain = NA}, but
+are never flagged nor drawn on the report's map. This
+analysis requires the \pkg{sf} package, and the map in the HTML report the
+\pkg{leaflet} package; without them, they are skipped with a message.
+
+Occurrence records are evidence to review, not proof: a record in a new state may be
+a cultivated specimen, a misidentification, or a georeferencing error, which is why
+the HTML report lists the individual records behind each candidate state.
 }
 \examples{
 \dontrun{
+# Candidate new state records for a species
 gap <- funga_distribution_gap(taxon = "Trichoderma harzianum")
 
-# Restrict the check to two states, using only GBIF
-gap_ba_pe <- funga_distribution_gap(taxon = "Trichoderma harzianum",
-                                    state = c("Bahia", "Pernambuco"),
-                                    sources = "gbif")
+# A whole genus, restricted to two states
+gap_ne <- funga_distribution_gap(taxon = "Trichoderma",
+                                 state = c("Pernambuco", "Paraiba"))
+
+# The candidate new phytogeographic domains, and the records behind them
+gap$domains
+gap$records[gap$records$New_domain_record_candidate, ]
+
+# Adding Reflora herbarium specimens (requires refloraR)
+gap_reflora <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+                                      sources = c("gbif", "reflora"))
 }
 
 }
 \seealso{
-\code{\link{mycobank_gap}}, \code{\link{mycobank_records}},
-  \code{\link{funga_records}}
+\code{\link{mycobank_gap}}, \code{\link{funga_records}}
 }
 \author{
 Domingos Cardoso

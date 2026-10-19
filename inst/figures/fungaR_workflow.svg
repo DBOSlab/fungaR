@@ -119,10 +119,10 @@
     <!-- Brazilian occurrence data column (one taller box) -->
     <rect x="780" y="512" width="340" height="152" rx="10" fill="#FFFFFF" stroke="#B5791E" stroke-width="1.5"/>
     <text x="950" y="540" text-anchor="middle" fill="#8A5A15" font-weight="600">funga_distribution_gap()</text>
-    <text x="950" y="562" text-anchor="middle" fill="#7a6a4a" font-size="10.5">Brazilian states with specimen evidence</text>
-    <text x="950" y="578" text-anchor="middle" fill="#7a6a4a" font-size="10.5">(GBIF / speciesLink / REFLORA)</text>
-    <text x="950" y="594" text-anchor="middle" fill="#7a6a4a" font-size="10.5">absent from FFB's official</text>
-    <text x="950" y="610" text-anchor="middle" fill="#7a6a4a" font-size="10.5">distribution for that taxon</text>
+    <text x="950" y="562" text-anchor="middle" fill="#7a6a4a" font-size="10.5">Brazilian states and phytogeographic domains</text>
+    <text x="950" y="578" text-anchor="middle" fill="#7a6a4a" font-size="10.5">with specimen evidence (GBIF / speciesLink / REFLORA)</text>
+    <text x="950" y="594" text-anchor="middle" fill="#7a6a4a" font-size="10.5">absent from FFB's official distribution,</text>
+    <text x="950" y="610" text-anchor="middle" fill="#7a6a4a" font-size="10.5">with an interactive domain map</text>
   </g>
 
   <!-- Review box, fed by all three columns -->

@@ -19,13 +19,13 @@ funga_match(
 )
 }
 \arguments{
-\item{splist1}{A character vector of fungal names — the reference list.
+\item{splist1}{A character vector of fungal names \u2014 the reference list.
 Each element should include at least a genus and a specific epithet, and
 optionally infraspecific rank, infraspecific epithet, and author name.
 Only valid characters are allowed (see
 \code{\link[base:validEnc]{base::validEnc}}).}
 
-\item{splist2}{A character vector of fungal names — the list to match against
+\item{splist2}{A character vector of fungal names \u2014 the list to match against
 \code{splist1}. Same format requirements as \code{splist1}.}
 
 \item{version}{Character. FFB dataset version to use. Defaults to
@@ -115,7 +115,7 @@ returns a merged data frame that aligns names across both lists.
 Each list is searched independently via \code{\link{funga_search}}. The
 accepted taxon IDs (\code{Accepted.taxon.ID}) are then used to determine
 which names in \code{splist2} correspond to names in \code{splist1}. Two
-names match when they resolve to the same accepted taxon — regardless of
+names match when they resolve to the same accepted taxon \u2014 regardless of
 whether one or both are synonyms.
 
 The resulting data frame is ordered by \code{splist1}. When

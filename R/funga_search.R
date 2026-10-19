@@ -80,7 +80,7 @@
 #'   \item{taxonomicStatus}{FFB taxonomic status: \code{"NOME_ACEITO"}
 #'     (accepted), \code{"SINONIMO"} (synonym), or
 #'     \code{"NOME_DUVIDOSO"} (doubtful).}
-#'   \item{Accepted.taxon.ID}{ID of the accepted name — same as
+#'   \item{Accepted.taxon.ID}{ID of the accepted name \u2014 same as
 #'     \code{FFB.taxon.ID} when the matched record is itself accepted; the
 #'     parent ID when it is a synonym.}
 #'   \item{Accepted.taxon.Name}{Accepted taxon name resolved from the FFB
@@ -125,7 +125,7 @@
 #' # Search with a misspelled epithet; flag fuzzy matches
 #' funga_search("Trichoderma harzianun", max_distance = 0.2, show_correct = TRUE)
 #'
-#' # Search a synonym — the result resolves to the accepted name
+#' # Search a synonym \u2014 the result resolves to the accepted name
 #' funga_search("Hypocrea lixii")
 #'
 #' # Search multiple names at once

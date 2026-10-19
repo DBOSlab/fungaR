@@ -171,7 +171,24 @@ parses the dataset automatically (like `funga_search()`, reusing the
 local cache on repeated calls). For fungi, the `habitat` argument
 doubles as substrate/host information (e.g. `"Planta viva - raiz"`,
 `"Tronco em decomposicao"`, `"Outro fungo"`), since FFB does not publish
-a separate named host-taxon field.
+a separate named host-taxon field. Every result is appended with the
+taxon’s full FFB distribution and species profile (`state`,
+`phytogeographicDomain`, `endemism`, `establishmentMeans`, `lifeForm`,
+`habitat`, `vegetationType`), each cell concatenating that taxon’s
+distinct recorded values with `" | "` (e.g. `"BA | MG | PE"`) —
+regardless of which filters were applied.
+
+`endemism` means **endemic to Brazil** in FFB. Combined with an area
+filter (`state`, `phytogeographicDomain`, or `vegetationType`),
+`endemism = TRUE` narrows further to taxa whose entire FFB range is
+*exclusive* to that area — so `state = "Bahia", endemism = TRUE` returns
+taxa found only in Bahia, not every Brazilian endemic that merely also
+occurs there. Use `endemism = "Brazil"` instead when you want Brazilian
+endemics that occur in an area, wherever else in Brazil they also occur.
+
+`establishmentMeans` filters by the taxon’s origin in Brazil —
+`"native"` or `"introduced"` (English or Portuguese,
+accent-insensitive).
 
 ``` r
 library(fungaR)
@@ -180,10 +197,19 @@ library(fungaR)
 hymeno <- funga_records(taxon = "Hymenochaetaceae",
                         taxonomicStatus = "NOME_ACEITO")
 
-# Accepted species endemic to Bahia
+# Species endemic to Bahia: found only in Bahia (not just occurring there)
 bahia_endemics <- funga_records(state = "Bahia",
                                 endemism = TRUE,
                                 taxonomicStatus = "NOME_ACEITO")
+
+# Brazilian endemics that occur in Bahia (and possibly elsewhere too)
+brazil_endemics_in_bahia <- funga_records(state = "Bahia",
+                                          endemism = "Brazil",
+                                          taxonomicStatus = "NOME_ACEITO")
+
+# Introduced (exotic) species recorded in Bahia
+bahia_introduced <- funga_records(state = "Bahia",
+                                  establishmentMeans = "introduced")
 
 # Lichenized fungi recorded in the Caatinga
 caatinga_lichens <- funga_records(phytogeographicDomain = "Caatinga",
@@ -194,8 +220,8 @@ root_associates <- funga_records(habitat = "Planta viva - raiz")
 
 # Save the result to a CSV file
 funga_records(
- taxon = "Trichoderma", 
- save = TRUE, 
+ taxon = "Trichoderma",
+ save = TRUE,
  dir = "funga_records"
 )
 ```
@@ -398,22 +424,34 @@ fast_records <- spfungorum_records(taxon = "Phellinotus", rank = "genus",
                                    fetch_details = FALSE)
 ```
 
-#### *11. `funga_distribution_gap`: Find candidate new state records*
+#### *11. `funga_distribution_gap`: Find candidate new state and phytogeographic domain records*
 
-Given a fungal genus or species, checks GBIF, speciesLink, and the
-Reflora Virtual Herbarium (via the
+Given a fungal genus or species, checks GBIF and, optionally,
+speciesLink and the Reflora Virtual Herbarium (via the
 [`refloraR`](https://github.com/DBOSlab/refloraR) package) for specimen
 evidence in Brazilian states that are not currently listed in FFB’s
 official distribution for that taxon — flagging candidate new state
-records. Its HTML report goes one step further than the state-level
-table, listing the actual **individual occurrence records** behind each
-new-state candidate, each linking directly to that record’s page on GBIF
-or REFLORA.
+records. By default (`domains = TRUE`), georeferenced records are also
+placed in the six Brazilian phytogeographic domains (Amazônia, Caatinga,
+Cerrado, Mata Atlântica, Pampa, Pantanal) using IBGE’s biome map bundled
+with the package, flagging candidate new **domain** records the same
+way, and plotted on an interactive map in the HTML report. The function
+returns a list of three tables — `states`, `domains`, and `records` —
+and the HTML report lists the actual **individual occurrence records**
+behind each candidate, each linking directly to that record’s page on
+GBIF or Reflora.
 
 ``` r
 library(fungaR)
 
 gap <- funga_distribution_gap(taxon = "Phellinotus piptadeniae")
+
+# Candidate new state records
+gap$states
+
+# Candidate new phytogeographic domain records, and the records behind them
+gap$domains
+gap$records[gap$records$New_domain_record_candidate, ]
 
 # Restrict the check to two states, using only GBIF
 gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
@@ -437,8 +475,13 @@ gap_ba_pe <- funga_distribution_gap(taxon = "Phellinotus piptadeniae",
   down to species, on FFB’s fungi hierarchy
 - Data Cleaning: Automated parsing and standardization of DwC-A fields
 - Fungal Data Curation: Cross-check MycoBank, GBIF, speciesLink, and
-  Reflora to flag species and state records missing from FFB, or
-  retrieve MycoBank records for a Brazilian taxon directly
+  Reflora to flag species, state, and phytogeographic domain records
+  missing from FFB, or retrieve MycoBank records for a Brazilian taxon
+  directly
+- Phytogeographic Domain Mapping: Place georeferenced occurrence records
+  in Brazil’s six phytogeographic domains and flag candidate new domain
+  records, with an interactive map in the `funga_distribution_gap()`
+  HTML report
 - Interactive HTML Reports: `mycobank_gap()`, `mycobank_records()`, and
   `funga_distribution_gap()` write filterable, downloadable HTML reports
   alongside their spreadsheet output

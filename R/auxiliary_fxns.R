@@ -146,103 +146,292 @@
 
 
 #_______________________________________________________________________________
-# Query GBIF's public occurrence API for Brazil-only evidence of a given
-# scientific name. Used by mycobank_gap() and funga_distribution_gap()
-# as the primary (reliable, no API key required) occurrence-evidence source.
-# Returns a list(n_records, states) and never errors -- any network/parsing
-# failure is caught and reported as NA so a single bad lookup never aborts a
-# batch of many taxa. ####
-.gbif_brazil_occurrence <- function(name) {
-  url <- paste0("https://api.gbif.org/v1/occurrence/search?scientificName=",
-               utils::URLencode(name, reserved = TRUE),
-               "&country=BR&limit=0&facet=STATE_PROVINCE&facetLimit=30")
-
-  res <- tryCatch(jsonlite::fromJSON(url), error = function(e) NULL)
-
-  empty_counts <- data.frame(state = character(0), count = integer(0))
-
-  if (is.null(res) || is.null(res$count)) {
-    return(list(n_records = NA_integer_, states = NA_character_, state_counts = empty_counts))
+# Normalise free-text Brazilian state values, as found in GBIF and other
+# occurrence databases, to FFB's full state names. Handles case, missing
+# diacritics, two-letter acronyms in any case ("Go", "df"), "Est./Estado
+# do/da/de ..." and "State of ..." prefixes, and "Brasilia" for the Federal
+# District. Values that are not a Brazilian state are returned as NA. ####
+.normalize_br_state <- function(x) {
+  states <- .br_states
+  key <- function(s) {
+    s <- tolower(stringi::stri_trans_general(s, "Latin-ASCII"))
+    s <- gsub("^\\s*(est\\.?|estado|state)\\s+(do|da|de|of)\\s+", "", s)
+    s <- gsub("\\s+state\\s*$", "", s)
+    gsub("\\s+", " ", trimws(s))
   }
+  lookup <- c(stats::setNames(names(states), key(names(states))),
+              stats::setNames(names(states), tolower(states)),
+              "brasilia" = "Distrito Federal")
+  out <- unname(lookup[key(x)])
+  out[is.na(x)] <- NA_character_
+  out
+}
 
-  states <- NA_character_
-  state_counts <- empty_counts
-  if (is.data.frame(res$facets) && nrow(res$facets) > 0) {
-    counts_df <- res$facets$counts[[1]]
-    if (is.data.frame(counts_df) && nrow(counts_df) > 0) {
-      states <- paste(counts_df$name, collapse = "; ")
-      state_counts <- data.frame(state = counts_df$name, count = as.integer(counts_df$count),
-                                 stringsAsFactors = FALSE)
+
+#_______________________________________________________________________________
+# Case-, accent-, and whitespace-insensitive key for matching FFB text values
+# ("Mata Atlantica" matches "Mata Atl\u00e2ntica", "Arvore" matches "\u00c1rvore") ####
+.ffb_key <- function(x) {
+  tolower(trimws(stringi::stri_trans_general(as.character(x), "Latin-ASCII")))
+}
+
+
+#_______________________________________________________________________________
+# The six Brazilian phytogeographic domains, as named by FFB and by IBGE's
+# biome map bundled in inst/extdata/br_domains.rds ####
+.br_domain_names <- c("Amaz\u00f4nia", "Caatinga", "Cerrado", "Mata Atl\u00e2ntica", "Pampa",
+                      "Pantanal")
+
+
+#_______________________________________________________________________________
+# Brazilian occurrence records of a GBIF taxon (including its synonyms and
+# infraspecific taxa), counted by state in a single faceted request. GBIF's
+# free-text state values are normalised to FFB state names, keeping the raw
+# values of each state so that its individual records can be fetched later.
+# Returns list(n_records, state_counts = data.frame(State, GBIF_records),
+# raw_states = named list State -> raw values), or NULL on failure. ####
+.gbif_brazil_state_counts <- function(taxon_key) {
+  res <- .get_json(sprintf(paste0("https://api.gbif.org/v1/occurrence/search?taxonKey=%s",
+                                  "&country=BR&limit=0&facet=stateProvince&facetLimit=500"),
+                           taxon_key))
+  if (is.null(res)) return(NULL)
+  counts <- if (length(res$facets) > 0) res$facets[[1]]$counts else list()
+  raw <- vapply(counts, function(x) as.character(x$name), character(1))
+  n <- vapply(counts, function(x) as.integer(x$count), integer(1))
+  state <- .normalize_br_state(raw)
+  keep <- !is.na(state)
+  if (!any(keep)) {
+    return(list(n_records = as.integer(res$count),
+                state_counts = data.frame(State = character(0), GBIF_records = integer(0),
+                                          stringsAsFactors = FALSE),
+                raw_states = list()))
+  }
+  totals <- tapply(n[keep], state[keep], sum)
+  list(n_records = as.integer(res$count),
+       state_counts = data.frame(State = names(totals), GBIF_records = as.integer(totals),
+                                 stringsAsFactors = FALSE),
+       raw_states = split(raw[keep], state[keep]))
+}
+
+
+#_______________________________________________________________________________
+# Individual (not aggregated) GBIF occurrence records of a taxon in one
+# Brazilian state, given all the raw state values GBIF uses for it (e.g.
+# "Bahia", "Ba", "Est. do Bahia"), each with a link to its GBIF occurrence
+# page. Used to list the records behind a new-state-record candidate. Never
+# errors - returns a zero-row data.frame on failure. ####
+.gbif_brazil_state_records <- function(taxon_key, raw_states, limit = 50) {
+  val <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
+  empty <- data.frame(Municipality = character(0), Locality = character(0),
+                      RecordedBy = character(0), RecordNumber = character(0),
+                      EventDate = character(0), Institution = character(0),
+                      CatalogNumber = character(0), Identified_as = character(0),
+                      RecordLink = character(0), stringsAsFactors = FALSE)
+  if (length(raw_states) == 0) return(empty)
+  res <- .get_json(sprintf("https://api.gbif.org/v1/occurrence/search?taxonKey=%s&country=BR%s&limit=%d",
+                           taxon_key,
+                           paste0("&stateProvince=", vapply(raw_states, utils::URLencode,
+                                                           character(1), reserved = TRUE),
+                                  collapse = ""),
+                           limit))
+  if (is.null(res) || length(res$results) == 0) return(empty)
+  do.call(rbind, lapply(res$results, function(r) {
+    data.frame(Municipality = val(r$municipality), Locality = val(r$locality),
+               RecordedBy = val(r$recordedBy), RecordNumber = val(r$recordNumber),
+               EventDate = val(r$eventDate),
+               Institution = if (is.null(r$institutionCode)) val(r$collectionCode) else val(r$institutionCode),
+               CatalogNumber = val(r$catalogNumber), Identified_as = val(r$scientificName),
+               RecordLink = paste0("https://www.gbif.org/occurrence/", val(r$key)),
+               stringsAsFactors = FALSE)
+  }))
+}
+
+
+#_______________________________________________________________________________
+# Georeferenced Brazilian GBIF records of a taxon (with its synonyms and
+# infraspecific taxa), excluding records GBIF flags with geospatial issues
+# (e.g. zero coordinates, or coordinates outside the stated country). Read
+# 300 at a time, up to 'max_records'. Returns one row per record; never
+# errors - returns what could be retrieved. ####
+.gbif_brazil_coordinates <- function(taxon_key, max_records = 5000) {
+  val <- function(x) if (is.null(x) || length(x) == 0) NA_character_ else as.character(x)
+  num <- function(x) if (is.null(x) || length(x) == 0) NA_real_ else as.numeric(x)
+  rows <- list()
+  offset <- 0
+  repeat {
+    res <- .get_json(sprintf(paste0("https://api.gbif.org/v1/occurrence/search?taxonKey=%s",
+                                    "&country=BR&hasCoordinate=true&hasGeospatialIssue=false",
+                                    "&limit=300&offset=%d"), taxon_key, offset))
+    if (is.null(res) || length(res$results) == 0) break
+    rows <- c(rows, lapply(res$results, function(r) {
+      data.frame(Latitude = num(r$decimalLatitude), Longitude = num(r$decimalLongitude),
+                 StateProvince = val(r$stateProvince), Municipality = val(r$municipality),
+                 Locality = val(r$locality), RecordedBy = val(r$recordedBy),
+                 RecordNumber = val(r$recordNumber), EventDate = val(r$eventDate),
+                 Institution = if (is.null(r$institutionCode)) val(r$collectionCode) else val(r$institutionCode),
+                 CatalogNumber = val(r$catalogNumber), Identified_as = val(r$scientificName),
+                 RecordLink = paste0("https://www.gbif.org/occurrence/", val(r$key)),
+                 stringsAsFactors = FALSE)
+    }))
+    offset <- offset + 300
+    if (isTRUE(res$endOfRecords) || offset >= max_records) break
+  }
+  if (length(rows) == 0) {
+    return(data.frame(Latitude = numeric(0), Longitude = numeric(0),
+                      StateProvince = character(0), Municipality = character(0),
+                      Locality = character(0), RecordedBy = character(0),
+                      RecordNumber = character(0), EventDate = character(0),
+                      Institution = character(0), CatalogNumber = character(0),
+                      Identified_as = character(0), RecordLink = character(0),
+                      stringsAsFactors = FALSE))
+  }
+  do.call(rbind, rows)
+}
+
+
+#_______________________________________________________________________________
+# The phytogeographic domain each coordinate falls in, from IBGE's biome map
+# (2019, simplified to 1 km) bundled in inst/extdata/br_domains.rds; NA for
+# coordinates outside the six domains (e.g. offshore or abroad). Requires the
+# 'sf' package: returns NULL without it. ####
+.assign_br_domain <- function(longitude, latitude) {
+  if (!requireNamespace("sf", quietly = TRUE)) return(NULL)
+  if (length(longitude) == 0) return(character(0))
+  domains <- .br_domains_map()
+  old <- suppressMessages(sf::sf_use_s2(FALSE))
+  on.exit(suppressMessages(sf::sf_use_s2(old)), add = TRUE)
+  out <- rep(NA_character_, length(longitude))
+  ok <- !is.na(longitude) & !is.na(latitude)
+  if (any(ok)) {
+    pts <- sf::st_as_sf(data.frame(x = longitude[ok], y = latitude[ok]),
+                        coords = c("x", "y"), crs = 4674)
+    hit <- suppressMessages(sf::st_intersects(pts, domains))
+    out[ok] <- vapply(hit, function(i) if (length(i) == 0) NA_character_ else domains$domain[i[1]],
+                      character(1))
+  }
+  out
+}
+
+.br_domains_map <- function() {
+  path <- system.file("extdata", "br_domains.rds", package = "fungaR")
+  if (!nzchar(path)) stop("The bundled domain map (br_domains.rds) was not found.", call. = FALSE)
+  readRDS(path)
+}
+
+
+#_______________________________________________________________________________
+# FFB's officially listed states and phytogeographic domains for a taxon,
+# from the parsed FFB taxon and distribution tables. For a genus, the states
+# of all its species and infraspecific taxa are combined (FFB does not list a
+# distribution for the genus itself); for a species, those of the species and
+# its infraspecific taxa. A synonym is replaced by its accepted name first.
+# Returns list(found, name, states, domains), domains named as in
+# .br_domain_names. ####
+.ffb_taxon_states <- function(taxon, taxon_df, distribution_df) {
+  rows <- which(taxon_df$taxonName %in% taxon)
+  if (length(rows) == 0) {
+    return(list(found = FALSE, name = taxon, states = character(0), domains = character(0)))
+  }
+  row <- rows[1]
+  name <- taxon
+  if ("acceptedNameUsageID" %in% names(taxon_df) &&
+      !is.na(taxon_df$acceptedNameUsageID[row]) &&
+      nzchar(taxon_df$acceptedNameUsageID[row]) &&
+      taxon_df$acceptedNameUsageID[row] != taxon_df$id[row]) {
+    acc <- which(taxon_df$id %in% taxon_df$acceptedNameUsageID[row])
+    if (length(acc) > 0) name <- taxon_df$taxonName[acc[1]]
+  }
+  one_word <- !grepl("\\s", name)
+  ids <- if (one_word) {
+    taxon_df$id[taxon_df$genus %in% name]
+  } else {
+    taxon_df$id[taxon_df$taxonName %in% name |
+                  startsWith(taxon_df$taxonName, paste0(name, " "))]
+  }
+  loc <- gsub("^BR-", "", distribution_df$locationID[distribution_df$id %in% ids])
+  loc <- loc[!is.na(loc) & nzchar(loc)]
+  states <- .normalize_br_state(loc)
+  dom <- distribution_df$phytogeographicDomain[distribution_df$id %in% ids]
+  domains <- .br_domain_names[match(.ffb_key(dom), .ffb_key(.br_domain_names))]
+  list(found = TRUE, name = name, states = sort(unique(states[!is.na(states)])),
+       domains = sort(unique(domains[!is.na(domains)])))
+}
+
+
+#_______________________________________________________________________________
+# Brazilian speciesLink records of a fungal name, counted by state. The
+# speciesLink API (https://specieslink.net/ws/1.0/) is open but needs a free
+# API key, passed as 'key'. Records are read up to 'max_records' (5000 per
+# page) and their state values normalised to FFB state names. Returns
+# data.frame(State, speciesLink_records), or NULL on failure. ####
+.splink_brazil_state_counts <- function(taxon, key, max_records = 20000) {
+  states <- character(0)
+  offset <- 0
+  repeat {
+    res <- .get_json(sprintf(paste0("https://specieslink.net/ws/1.0/search?scientificname=%s",
+                                    "&country=Brazil&kingdom=Fungi&limit=5000&offset=%d",
+                                    "&apikey=%s"),
+                             utils::URLencode(taxon, reserved = TRUE), offset,
+                             utils::URLencode(key, reserved = TRUE)))
+    if (is.null(res)) return(if (offset == 0) NULL else break)
+    feats <- res$features
+    if (length(feats) == 0) break
+    states <- c(states, vapply(feats, function(f) {
+      p <- f$properties
+      nm <- names(p)[tolower(names(p)) == "stateprovince"]
+      if (length(nm) == 0 || is.null(p[[nm[1]]])) NA_character_ else as.character(p[[nm[1]]])
+    }, character(1)))
+    offset <- offset + 5000
+    if (length(feats) < 5000 || offset >= max_records) break
+  }
+  st <- .normalize_br_state(states)
+  st <- st[!is.na(st)]
+  if (length(st) == 0) {
+    return(data.frame(State = character(0), speciesLink_records = integer(0),
+                      stringsAsFactors = FALSE))
+  }
+  tab <- table(st)
+  data.frame(State = names(tab), speciesLink_records = as.integer(tab),
+             stringsAsFactors = FALSE)
+}
+
+
+#_______________________________________________________________________________
+# One string per id in 'ids': the sorted unique non-empty values recorded for
+# it, joined with 'sep'; NA when it has none ####
+.collapse_by_id <- function(id, value, ids, sep = " | ") {
+  value <- trimws(as.character(value))
+  keep <- id %in% ids & !is.na(value) & nzchar(value)
+  d <- unique(data.frame(id = id[keep], value = value[keep], stringsAsFactors = FALSE))
+  d <- d[order(d$id, stringi::stri_trans_general(d$value, "Latin-ASCII")), ]
+  joined <- vapply(split(d$value, d$id), paste, character(1), collapse = sep)
+  unname(joined[as.character(ids)])
+}
+
+
+#_______________________________________________________________________________
+# Add the taxon's FFB distribution (state, phytogeographicDomain, endemism,
+# establishmentMeans) and species profile (lifeForm, habitat, vegetationType)
+# to the taxon records, the unique values of each field joined with " | " ####
+.add_ffb_profile <- function(records, distribution_df, speciesprofile_df, sep = " | ") {
+  ids <- records$id
+  dist <- distribution_df
+  prof <- speciesprofile_df
+  if (!is.null(dist) && !is.null(dist$locationID)) {
+    dist$state <- gsub("^BR-", "", dist$locationID)
+  }
+  fields <- list(state = dist, phytogeographicDomain = dist, endemism = dist,
+                 establishmentMeans = dist, lifeForm = prof, habitat = prof,
+                 vegetationType = prof)
+  for (field in names(fields)) {
+    df <- fields[[field]]
+    records[[field]] <- if (is.null(df) || is.null(df[[field]])) {
+      rep(NA_character_, length(ids))
+    } else {
+      .collapse_by_id(df$id, df[[field]], ids, sep = sep)
     }
   }
-
-  list(n_records = as.integer(res$count), states = states, state_counts = state_counts)
-}
-
-
-#_______________________________________________________________________________
-# Fetch individual (record-level, not aggregated) GBIF occurrence records for a
-# given scientific name within one Brazilian state, each with a direct link to
-# the record's own GBIF occurrence page. Used by funga_distribution_gap() to
-# list the actual specimen/observation records backing a new-state-record
-# candidate, not just the state-level count. Never errors - any failure
-# returns a zero-row data frame with the expected columns. ####
-.gbif_brazil_state_records <- function(name, state, limit = 50) {
-  wanted <- c("key", "scientificName", "stateProvince", "municipality", "locality",
-             "recordedBy", "recordNumber", "eventDate", "institutionCode",
-             "collectionCode", "catalogNumber", "decimalLatitude", "decimalLongitude")
-  empty <- as.data.frame(stats::setNames(rep(list(character(0)), length(wanted)), wanted),
-                         stringsAsFactors = FALSE)
-
-  url <- paste0("https://api.gbif.org/v1/occurrence/search?scientificName=",
-               utils::URLencode(name, reserved = TRUE),
-               "&country=BR&stateProvince=", utils::URLencode(state, reserved = TRUE),
-               "&limit=", limit)
-
-  res <- tryCatch(jsonlite::fromJSON(url), error = function(e) NULL)
-
-  if (is.null(res) || is.null(res$results) || !is.data.frame(res$results) ||
-      nrow(res$results) == 0) {
-    return(empty)
-  }
-
-  df <- res$results
-  for (col in setdiff(wanted, names(df))) df[[col]] <- NA
-  df <- df[, wanted, drop = FALSE]
-  df$GBIF_URL <- paste0("https://www.gbif.org/occurrence/", df$key)
-
-  df
-}
-
-
-#_______________________________________________________________________________
-# Query speciesLink's public web service for Brazil-only evidence of a given
-# scientific name. speciesLink's 'api.' endpoint has known reliability issues
-# (an SSL certificate that does not match its own hostname, as of this
-# writing) so this is strictly best-effort: any failure is caught and
-# reported as NA rather than raised, and callers should treat GBIF as the
-# dependable primary source. ####
-.splink_brazil_occurrence <- function(name) {
-  url <- paste0("https://api.splink.org.br/index?operation=RECORDS&species=",
-               utils::URLencode(name, reserved = TRUE),
-               "&country=Brasil&Scope=microrganisms&MaxRecords=200")
-
-  res <- tryCatch(suppressWarnings(jsonlite::fromJSON(url)),
-                  error = function(e) NULL)
-
-  if (is.null(res) || is.null(res$features) || length(res$features) == 0) {
-    return(list(n_records = NA_integer_, states = NA_character_))
-  }
-
-  recs <- res$features
-  state_col <- intersect(c("stateprovince", "stateProvince"), names(recs))
-  states <- if (length(state_col) > 0) {
-    paste(sort(unique(stats::na.omit(recs[[state_col[1]]]))), collapse = "; ")
-  } else {
-    NA_character_
-  }
-
-  list(n_records = nrow(recs), states = if (nzchar(states)) states else NA_character_)
+  records
 }
 
 
@@ -1079,23 +1268,36 @@
 
 
 #_______________________________________________________________________________
-# Resolve a genus to its GBIF backbone key, restricted to the Fungi kingdom
-# only (unlike floraR's gbif_gap(), which searches the kingdoms holding
-# plants and algae). Returns list(key, name, kingdom) or NULL when no exact
-# genus match is found in Fungi. ####
+# Resolve a taxon name to its GBIF backbone key, restricted to the Fungi
+# kingdom only (unlike floraR's gbif_gap(), which searches the kingdoms
+# holding plants and algae). 'rank' defaults to "GENUS"; pass "SPECIES" (or
+# NULL to not filter by rank at all) for a species-level lookup. Returns
+# list(key, name, kingdom) or NULL when no exact match is found in Fungi. ####
 .gbif_kingdoms <- c("Fungi")
 
-.gbif_genus_key <- function(taxon) {
+.gbif_genus_key <- function(taxon, rank = "GENUS") {
   for (k in .gbif_kingdoms) {
-    res <- .get_json(sprintf("https://api.gbif.org/v1/species/match?name=%s&rank=GENUS&kingdom=%s&strict=true",
+    res <- .get_json(sprintf("https://api.gbif.org/v1/species/match?name=%s%s&kingdom=%s&strict=true",
                              utils::URLencode(taxon, reserved = TRUE),
+                             if (is.null(rank)) "" else paste0("&rank=", rank),
                              utils::URLencode(k, reserved = TRUE)))
-    if (!is.null(res) && identical(res$matchType, "EXACT") && identical(res$rank, "GENUS") &&
-        identical(res$kingdom, k)) {
+    if (!is.null(res) && identical(res$matchType, "EXACT") &&
+        (is.null(rank) || identical(res$rank, rank)) && identical(res$kingdom, k)) {
       return(list(key = res$usageKey, name = res$scientificName, kingdom = res$kingdom))
     }
   }
   NULL
+}
+
+
+#_______________________________________________________________________________
+# Resolve a fungal name (genus or species) to its GBIF backbone key: one word
+# is looked up as a genus, two as a species, following .gbif_genus_key()'s
+# Fungi-only rules. Returns list(key, name, kingdom) or NULL. ####
+.gbif_fungi_key <- function(taxon) {
+  n_words <- length(strsplit(trimws(taxon), "\\s+")[[1]])
+  rank <- if (n_words == 1) "GENUS" else if (n_words == 2) "SPECIES" else NULL
+  .gbif_genus_key(taxon, rank = rank)
 }
 
 
