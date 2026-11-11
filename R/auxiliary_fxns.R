@@ -198,7 +198,16 @@
   counts <- if (length(res$facets) > 0) res$facets[[1]]$counts else list()
   raw <- vapply(counts, function(x) as.character(x$name), character(1))
   n <- vapply(counts, function(x) as.integer(x$count), integer(1))
-  state <- .normalize_br_state(raw)
+  # GBIF is queried for Brazil only, so the country is set for
+  # barRoso::std_place() to standardise the Brazilian state values
+  if (length(raw) > 0) {
+    raw_std <- suppressMessages(barRoso::std_place(data.frame(
+      country = "Brazil", stateProvince = raw, locality = NA_character_,
+      stringsAsFactors = FALSE)))$stateProvince
+  } else {
+    raw_std <- character(0)
+  }
+  state <- .normalize_br_state(raw_std)
   keep <- !is.na(state)
   if (!any(keep)) {
     return(list(n_records = as.integer(res$count),
@@ -383,6 +392,11 @@
     }, character(1)))
     offset <- offset + 5000
     if (length(feats) < 5000 || offset >= max_records) break
+  }
+  if (length(states) > 0) {
+    states <- suppressMessages(barRoso::std_place(data.frame(
+      country = "Brazil", stateProvince = states, locality = NA_character_,
+      stringsAsFactors = FALSE)))$stateProvince
   }
   st <- .normalize_br_state(states)
   st <- st[!is.na(st)]
@@ -1411,4 +1425,229 @@
                       stringsAsFactors = FALSE))
   }
   do.call(rbind, rows)
+}
+
+
+#_______________________________________________________________________________
+# Herbarium specimen sources read through the DBOSlab packages refloraR
+# (Reflora Virtual Herbarium) and jabotR (JABOT, the Rio de Janeiro Botanical
+# Garden's herbarium system). On first use each downloads its herbaria's
+# DwC-A archives to "reflora_download" / "jabot_download" in the working
+# directory, and reuses them afterwards. ####
+.herbarium_sources <- list(
+  reflora = list(label = "Reflora", pkg = "refloraR", fun = "reflora_records",
+                 column = "Reflora_records", download_dir = "reflora_download"),
+  jabot = list(label = "JABOT", pkg = "jabotR", fun = "jabot_records",
+               column = "Jabot_records", download_dir = "jabot_download")
+)
+
+
+#_______________________________________________________________________________
+# Delete the downloaded archives of the given herbarium sources ("reflora",
+# "jabot") from the working directory - for keep_downloads = FALSE ####
+.rm_herbarium_downloads <- function(sources, verbose = TRUE) {
+  dirs <- vapply(.herbarium_sources[intersect(names(.herbarium_sources), sources)],
+                 `[[`, character(1), "download_dir")
+  dirs <- dirs[dir.exists(dirs)]
+  if (length(dirs) > 0) {
+    unlink(dirs, recursive = TRUE)
+    if (verbose) message("Removed the downloaded archives: ", paste(dirs, collapse = ", "))
+  }
+  invisible(dirs)
+}
+
+
+#_______________________________________________________________________________
+# Query one herbarium source ("reflora" or "jabot") for a taxon, returning its
+# records standardised by .std_herbarium_records(), or NULL when the package
+# is not installed or the query fails ####
+.herbarium_records <- function(source, taxon, verbose = TRUE) {
+  info <- .herbarium_sources[[source]]
+  if (!requireNamespace(info$pkg, quietly = TRUE)) {
+    if (verbose) {
+      message("  Package '", info$pkg, "' is not installed; skipping ", info$label,
+              ". Install it with remotes::install_github('DBOSlab/", info$pkg,
+              "') to include this source.")
+    }
+    return(NULL)
+  }
+  if (verbose) {
+    message("Querying ", info$label, " herbarium specimens (via ", info$pkg, "; the first ",
+            "use downloads the ", info$label, " archives, and reading them can take ",
+            "several minutes)...")
+  }
+  fun <- getExportedValue(info$pkg, info$fun)
+  raw <- tryCatch(fun(taxon = taxon, verbose = FALSE, save = FALSE), error = function(e) {
+    if (verbose) message("  ", info$label, " query failed: ", conditionMessage(e))
+    NULL
+  })
+  if (is.null(raw)) return(NULL)
+  .std_herbarium_records(raw, info$label)
+}
+
+
+#_______________________________________________________________________________
+# Standardise the Darwin Core records returned by refloraR/jabotR into the
+# columns fungaR uses: places are standardised with barRoso::std_place() and
+# State then normalised to FFB state names, Type_status with
+# barRoso::std_types(), Taxon_name is the species-level name of the
+# specimen's identification ("Genus epithet"; NA above species), and
+# RecordLink is the specimen's page, when the source gives one ####
+.std_herbarium_records <- function(df, label) {
+  df <- as.data.frame(df, stringsAsFactors = FALSE)
+  n <- nrow(df)
+  for (nm in c("country", "stateProvince", "municipality", "locality", "typeStatus")) {
+    if (!nm %in% names(df)) df[[nm]] <- rep(NA_character_, n)
+  }
+  if (n > 0) {
+    df <- suppressMessages(barRoso::std_types(barRoso::std_place(df)))
+  }
+  col <- function(nm) if (nm %in% names(df)) as.character(df[[nm]]) else rep(NA_character_, n)
+  num <- function(nm) suppressWarnings(as.numeric(col(nm)))
+  genus <- trimws(col("genus"))
+  epithet <- trimws(col("specificEpithet"))
+  has_epithet <- !is.na(genus) & nzchar(genus) & !is.na(epithet) & nzchar(epithet)
+  link <- col("bibliographicCitation")
+  link <- ifelse(grepl("https?://", link), sub(".*?(https?://[^[:space:]]+).*", "\\1", link),
+                 NA_character_)
+  data.frame(Source = rep(label, n),
+             Taxon_name = ifelse(has_epithet, paste(genus, epithet), NA_character_),
+             Identified_as = col("scientificName"),
+             Authors = col("scientificNameAuthorship"),
+             Type_status = col("typeStatus"),
+             Country = col("country"),
+             State = .normalize_br_state(col("stateProvince")),
+             Municipality = col("municipality"),
+             Locality = col("locality"),
+             Latitude = num("decimalLatitude"),
+             Longitude = num("decimalLongitude"),
+             RecordedBy = col("recordedBy"),
+             RecordNumber = col("recordNumber"),
+             EventDate = col("year"),
+             Institution = col("collectionCode"),
+             CatalogNumber = col("catalogNumber"),
+             RecordLink = link,
+             stringsAsFactors = FALSE)
+}
+
+
+#_______________________________________________________________________________
+# Records collected in Brazil: the country is Brazil in any spelling
+# ("Brasil", "Brazil", "Bresil", "BR"), or it is missing but the state is a
+# Brazilian state ####
+.in_brazil <- function(country, state) {
+  key <- .ffb_key(country)
+  key %in% c("brasil", "brazil", "bresil", "br") |
+    ((is.na(country) | !nzchar(trimws(country))) & !is.na(state))
+}
+
+
+#_______________________________________________________________________________
+# Validate the 'taxon' argument of the *_gap() functions: a character vector
+# of one or more names, returned trimmed, with single spaces, and without
+# duplicates ####
+.check_taxa <- function(taxon, what) {
+  if (missing(taxon) || is.null(taxon) || !is.character(taxon) || length(taxon) == 0 ||
+      anyNA(taxon) || any(!nzchar(trimws(taxon)))) {
+    stop("'taxon' must be a character vector of one or more ", what, "s.", call. = FALSE)
+  }
+  unique(trimws(gsub("\\s+", " ", taxon)))
+}
+
+
+#_______________________________________________________________________________
+# Query each requested herbarium source ("reflora", "jabot") once for all the
+# taxa, so that their archives are read a single time per run. Returns a
+# list named by source, NULL for a source that could not be queried ####
+.herbarium_records_all <- function(sources, taxa, verbose = TRUE) {
+  out <- list()
+  for (src in intersect(names(.herbarium_sources), sources)) {
+    recs <- .herbarium_records(src, taxa, verbose)
+    if (!is.null(recs)) out[[src]] <- recs
+  }
+  out
+}
+
+
+#_______________________________________________________________________________
+# The records of one taxon among those standardised by .std_herbarium_records()
+# for several: a genus matches the first word of the identification, a
+# species its species-level name. NULL stays NULL (source not queried) ####
+.herbarium_subset <- function(recs, taxon) {
+  if (is.null(recs)) return(NULL)
+  if (grepl(" ", taxon)) {
+    keep <- .ffb_key(recs$Taxon_name) %in% .ffb_key(taxon)
+  } else {
+    name <- ifelse(is.na(recs$Taxon_name), recs$Identified_as, recs$Taxon_name)
+    keep <- .ffb_key(sub("\\s.*", "", trimws(name))) %in% .ffb_key(taxon)
+  }
+  recs[keep, , drop = FALSE]
+}
+
+
+#_______________________________________________________________________________
+# Run 'f' on each taxon, returning the outputs as a list named by taxon. With
+# several taxa, a failure is reported and the taxon skipped, so that one bad
+# name does not stop the whole run ####
+.run_per_taxon <- function(taxa, verbose, f) {
+  outs <- list()
+  for (i in seq_along(taxa)) {
+    tx <- taxa[i]
+    if (length(taxa) == 1) {
+      outs[[tx]] <- f(tx)
+      next
+    }
+    if (verbose) message(sprintf("\n\u2500\u2500 %s (%d/%d) \u2500\u2500", tx, i, length(taxa)))
+    res <- tryCatch(f(tx), error = function(e) {
+      if (verbose) message("  Skipping '", tx, "': ", conditionMessage(e))
+      NULL
+    })
+    if (!is.null(res)) outs[[tx]] <- res
+  }
+  outs
+}
+
+
+#_______________________________________________________________________________
+# rbind() data frames whose columns may differ (e.g. a source that returned
+# nothing for one taxon), filling the missing columns with NA ####
+.rbind_fill <- function(dfs) {
+  dfs <- Filter(function(d) !is.null(d) && ncol(d) > 0, dfs)
+  if (length(dfs) == 0) return(data.frame())
+  cols <- unique(unlist(lapply(dfs, names)))
+  dfs <- lapply(dfs, function(d) {
+    for (nm in setdiff(cols, names(d))) d[[nm]] <- rep(NA, nrow(d))
+    d[, cols, drop = FALSE]
+  })
+  out <- do.call(rbind, dfs)
+  rownames(out) <- NULL
+  out
+}
+
+
+#_______________________________________________________________________________
+# The single HTML report of a *_gap() run listing the taxa for which nothing
+# new was found - so that no FFB update is needed - with what was searched
+# for each. Written to <dir>/__no_new_records_report.html (distribution),
+# only when there is at least one such taxon ####
+.no_gap_file <- c(distribution = "__no_new_records_report")
+
+.no_gap_report <- function(outs, what, sources, dir, html_report, verbose, open_report) {
+  rows <- .rbind_fill(lapply(outs, attr, "no_gap"))
+  if (!html_report || nrow(rows) == 0) return(invisible(FALSE))
+  labels <- c(gbif = "GBIF", reflora = "Reflora", jabot = "JABOT",
+              speciesLink = "speciesLink")
+  dir <- .arg_check_dir(dir)
+  if (verbose) {
+    message("\n", nrow(rows), " taxon/taxa with nothing new for FFB, listed in ",
+            .no_gap_file[[what]], ".html")
+  }
+  .funga_render_report(template = "funga_no_gap_report.Rmd",
+                       data_list = list(what = what, sources = unname(labels[sources]),
+                                        result = rows),
+                       taxon = paste(rows[[1]], collapse = ", "),
+                       dir = dir,
+                       filename = .no_gap_file[[what]],
+                       verbose = verbose,
+                       open_report = open_report)
 }

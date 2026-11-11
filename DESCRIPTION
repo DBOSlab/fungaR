@@ -31,6 +31,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports:
+    barRoso,
     stringr,
     stringi,
     stats,
@@ -50,6 +51,7 @@ Suggests:
     testthat (>= 3.0.0),
     withr,
     refloraR,
+    jabotR,
     rmarkdown,
     DT,
     htmltools,
@@ -57,7 +59,9 @@ Suggests:
     sf,
     leaflet
 Remotes:
-    DBOSlab/refloraR
+    DBOSlab/refloraR,
+    DBOSlab/jabotR,
+    DBOSlab/barRoso
 URL:
     https://dboslab.github.io/fungaR-website/,
     https://github.com/dboslab/fungaR

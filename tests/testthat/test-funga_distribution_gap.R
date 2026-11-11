@@ -22,14 +22,19 @@
 .mock_dist_ffb <- function(env = parent.frame()) {
   testthat::local_mocked_bindings(
     .funga_prepare_records = function(version, verbose, rm_funga_database) .dist_ffb_fixture(),
+    # Reflora and JABOT are queried by default: no archives in tests, unless a
+    # test mocks them with herbarium records
+    .herbarium_records = function(source, taxon, verbose = TRUE) NULL,
     .package = "fungaR",
     .env = env
   )
 }
 
 .mock_dist_gbif <- function(state_counts, found = TRUE, coordinates = NULL,
-                            env = parent.frame()) {
+                            herbaria = list(), env = parent.frame()) {
   testthat::local_mocked_bindings(
+    # Reflora and JABOT: the records given in 'herbaria' (by source), else none
+    .herbarium_records = function(source, taxon, verbose = TRUE) herbaria[[source]],
     .gbif_fungi_key = function(taxon) {
       if (found) list(key = 1L, name = taxon, kingdom = "Fungi") else NULL
     },
@@ -251,9 +256,10 @@ test_that("funga_distribution_gap explains when FFB lists no state for the taxon
 })
 
 
-test_that("funga_distribution_gap requires a single character taxon and valid sources", {
-  expect_error(funga_distribution_gap(taxon = NULL), "single character string")
-  expect_error(funga_distribution_gap(taxon = c("A", "B")), "single character string")
+test_that("funga_distribution_gap requires a character taxon and valid sources", {
+  expect_error(funga_distribution_gap(taxon = NULL), "character vector")
+  expect_error(funga_distribution_gap(taxon = 1), "character vector")
+  expect_error(funga_distribution_gap(taxon = c("A", "")), "character vector")
   expect_error(funga_distribution_gap(taxon = "A", sources = "inaturalist"), "should be one of")
 })
 
@@ -269,11 +275,11 @@ test_that("funga_distribution_gap writes a real .xlsx file and HTML report", {
   out_dir <- withr::local_tempdir()
 
   funga_distribution_gap(taxon = "Trichoderma harzianum", save = TRUE, html_report = TRUE,
-                         open_report = FALSE, dir = out_dir, filename = "dist_test",
-                         verbose = FALSE)
+                         open_report = FALSE, dir = out_dir, verbose = FALSE)
 
-  expect_true(file.exists(file.path(out_dir, "dist_test.xlsx")))
-  expect_true(file.exists(file.path(out_dir, "dist_test.html")))
+  stem <- file.path(out_dir, "funga_distribution_gap_Trichoderma_harzianum")
+  expect_true(file.exists(paste0(stem, ".xlsx")))
+  expect_true(file.exists(paste0(stem, ".html")))
 })
 
 
@@ -404,8 +410,9 @@ test_that("funga_distribution_gap saves the three tables as spreadsheet sheets",
   out_dir <- withr::local_tempdir()
 
   funga_distribution_gap(taxon = "Trichoderma harzianum", save = TRUE, html_report = FALSE,
-                         dir = out_dir, filename = "dist_sheets", verbose = FALSE)
-  expect_equal(openxlsx::getSheetNames(file.path(out_dir, "dist_sheets.xlsx")),
+                         dir = out_dir, verbose = FALSE)
+  expect_equal(openxlsx::getSheetNames(file.path(
+    out_dir, "funga_distribution_gap_Trichoderma_harzianum.xlsx")),
                c("states", "domains", "records"))
 })
 
@@ -423,9 +430,188 @@ test_that("funga_distribution_gap renders the report with the domain map", {
 
   expect_no_warning(
     funga_distribution_gap(taxon = "Trichoderma harzianum", save = FALSE, html_report = TRUE,
-                           open_report = FALSE, dir = out_dir, filename = "dist_map",
-                           verbose = FALSE))
-  html <- paste(readLines(file.path(out_dir, "dist_map.html"), warn = FALSE), collapse = "")
+                           open_report = FALSE, dir = out_dir, verbose = FALSE))
+  html <- paste(readLines(file.path(out_dir,
+                                    "funga_distribution_gap_Trichoderma_harzianum.html"),
+                          warn = FALSE), collapse = "")
   expect_match(html, "Map of Georeferenced Records", fixed = TRUE)
   expect_match(html, "leaflet", fixed = TRUE)
+})
+
+
+# ---------------------------------------------------------------------------
+# Reflora and JABOT herbarium specimens
+# ---------------------------------------------------------------------------
+# Raw Darwin Core records, as returned by refloraR/jabotR, standardised by
+# .std_herbarium_records() (with barRoso::std_place() and std_types())
+.herbarium_fixture <- function() {
+  reflora <- data.frame(
+    collectionCode = c("ALCB", "HUEFS", "LPB"), catalogNumber = c("1", "2", "3"),
+    genus = "Trichoderma", specificEpithet = "harzianum",
+    scientificName = "Trichoderma harzianum Rifai",
+    country = c("Brasil", "Brasil", "Bolivia"),
+    stateProvince = c("BA", "Piaui", "Santa Cruz"),
+    municipality = NA_character_, locality = NA_character_,
+    decimalLatitude = NA, decimalLongitude = NA,
+    recordedBy = "D. Cardoso", recordNumber = c("10", "11", "12"), year = "2010",
+    typeStatus = NA_character_,
+    bibliographicCitation = paste0("Reflora Virtual Herbarium, available at: ",
+                                   "https://reflora.jbrj.gov.br/r?codigoBarra=", 1:3),
+    stringsAsFactors = FALSE)
+  jabot <- data.frame(
+    collectionCode = "RB", catalogNumber = "99",
+    genus = "Trichoderma", specificEpithet = "harzianum",
+    scientificName = "Trichoderma harzianum", country = "Brazil",
+    stateProvince = "Sergipe", municipality = "Aracaju", locality = NA_character_,
+    decimalLatitude = -10.9, decimalLongitude = -37.1,
+    recordedBy = "L.P. Queiroz", recordNumber = "5", year = "1999", typeStatus = NA_character_,
+    stringsAsFactors = FALSE)
+  list(reflora = .std_herbarium_records(reflora, "Reflora"),
+       jabot = .std_herbarium_records(jabot, "JABOT"))
+}
+
+
+test_that(".std_herbarium_records standardises places, links, and names", {
+  h <- .herbarium_fixture()$reflora
+  expect_equal(h$Country, c("Brazil", "Brazil", "Bolivia"))
+  expect_equal(h$State[1:2], c("Bahia", "Piau\u00ed"))
+  expect_equal(h$Taxon_name, rep("Trichoderma harzianum", 3))
+  expect_equal(h$Institution, c("ALCB", "HUEFS", "LPB"))
+  expect_equal(h$RecordLink[1], "https://reflora.jbrj.gov.br/r?codigoBarra=1")
+})
+
+
+test_that("funga_distribution_gap combines GBIF, Reflora, and JABOT by default", {
+  .mock_dist_ffb()
+  .mock_dist_gbif(.gbif_counts("Bahia", 5), herbaria = .herbarium_fixture())
+
+  result <- funga_distribution_gap(taxon = "Trichoderma harzianum", save = FALSE,
+                                   html_report = FALSE, verbose = FALSE)
+  st <- result$states
+  expect_true(all(c("GBIF_records", "Reflora_records", "Jabot_records") %in% names(st)))
+  # Piaui only in Reflora, Sergipe only in JABOT: both are candidates
+  expect_setequal(st$State[st$New_state_record_candidate],
+                  c("Piau\u00ed", "Sergipe"))
+  expect_equal(st$Reflora_records[st$State == "Bahia"], 1L)
+  expect_equal(st$Jabot_records[st$State == "Sergipe"], 1L)
+  # The Bolivian specimen is not counted
+  expect_equal(sum(st$Reflora_records), 2L)
+  # JABOT's georeferenced specimen is placed in a domain
+  expect_true("JABOT" %in% result$records$Source)
+})
+
+
+test_that("funga_distribution_gap queries only the requested herbaria", {
+  .mock_dist_ffb()
+  .mock_dist_gbif(.gbif_counts("Bahia", 5), herbaria = .herbarium_fixture())
+
+  st <- funga_distribution_gap(taxon = "Trichoderma harzianum", sources = "gbif",
+                               save = FALSE, html_report = FALSE, verbose = FALSE)$states
+  expect_false(any(c("Reflora_records", "Jabot_records") %in% names(st)))
+
+  st <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+                               sources = c("gbif", "jabot"),
+                               save = FALSE, html_report = FALSE, verbose = FALSE)$states
+  expect_true("Jabot_records" %in% names(st))
+  expect_false("Reflora_records" %in% names(st))
+})
+
+
+test_that("keep_downloads = FALSE removes the Reflora and JABOT download folders", {
+  .mock_dist_ffb()
+  .mock_dist_gbif(.gbif_counts("Bahia", 5))
+  withr::local_dir(withr::local_tempdir())
+  run <- function(...) {
+    dir.create("reflora_download", showWarnings = FALSE)
+    dir.create("jabot_download", showWarnings = FALSE)
+    funga_distribution_gap(taxon = "Trichoderma harzianum", save = FALSE,
+                           html_report = FALSE, verbose = FALSE, ...)
+  }
+
+  run()
+  expect_true(all(dir.exists(c("reflora_download", "jabot_download"))))
+
+  run(keep_downloads = FALSE)
+  expect_false(any(dir.exists(c("reflora_download", "jabot_download"))))
+
+  # Only the folders of the queried sources are removed
+  run(sources = c("gbif", "jabot"), keep_downloads = FALSE)
+  expect_true(dir.exists("reflora_download"))
+  expect_false(dir.exists("jabot_download"))
+})
+
+
+# ---------------------------------------------------------------------------
+# Several taxa in one call
+# ---------------------------------------------------------------------------
+test_that("several taxa: herbaria are queried once and results are stacked", {
+  .mock_dist_ffb()
+  .mock_dist_gbif(.gbif_counts("Bahia", 1))
+  calls <- list()
+  h <- .herbarium_fixture()
+  testthat::local_mocked_bindings(
+    .herbarium_records = function(source, taxon, verbose = TRUE) {
+      calls[[length(calls) + 1]] <<- taxon
+      h[[source]]
+    },
+    .package = "fungaR"
+  )
+  out_dir <- withr::local_tempdir()
+  res <- funga_distribution_gap(taxon = c("Trichoderma harzianum", "Trichoderma bahiense",
+                                          "Trichoderma harzianum"),
+                                domains = FALSE, save = TRUE, html_report = FALSE,
+                                dir = out_dir, verbose = FALSE)
+
+  # one query per herbarium, with all the (unique) taxa
+  expect_length(calls, 2)
+  expect_equal(calls[[1]], c("Trichoderma harzianum", "Trichoderma bahiense"))
+  # both taxa in one table, each with its own FFB states
+  expect_setequal(unique(res$states$Taxon), c("Trichoderma harzianum",
+                                               "Trichoderma bahiense"))
+  bah <- res$states[res$states$Taxon == "Trichoderma bahiense", ]
+  expect_true(bah$In_FFB_distribution[bah$State == "Minas Gerais"])
+  # herbarium specimens of harzianum are not counted for bahiense
+  expect_false("Piau\u00ed" %in% bah$State[bah$Reflora_records > 0])
+  # one spreadsheet per taxon, named after it
+  expect_setequal(list.files(out_dir),
+                  c("funga_distribution_gap_Trichoderma_harzianum.xlsx",
+                    "funga_distribution_gap_Trichoderma_bahiense.xlsx"))
+})
+
+
+test_that("several taxa: a failing taxon is skipped, not fatal", {
+  .mock_dist_ffb()
+  .mock_dist_gbif(.gbif_counts("Bahia", 1))
+  testthat::local_mocked_bindings(
+    .distribution_gap_taxon = function(taxon, ...) {
+      if (taxon == "Bad name") stop("boom")
+      list(states = data.frame(Taxon = taxon, State = "Bahia"),
+           domains = .empty_domain_table(), records = .empty_coord_records())
+    },
+    .package = "fungaR"
+  )
+  expect_message(
+    res <- funga_distribution_gap(taxon = c("Bad name", "Trichoderma harzianum"),
+                                  save = FALSE, html_report = FALSE),
+    "Skipping 'Bad name': boom")
+  expect_equal(res$states$Taxon, "Trichoderma harzianum")
+  # with a single taxon, the error is not swallowed
+  expect_error(funga_distribution_gap(taxon = "Bad name", save = FALSE, html_report = FALSE,
+                                      verbose = FALSE), "boom")
+})
+
+
+test_that(".herbarium_subset keeps a genus or a species, and .rbind_fill fills columns", {
+  recs <- data.frame(Taxon_name = c("Trichoderma harzianum", NA, "Xylaria polymorpha"),
+                     Identified_as = c("Trichoderma harzianum Rifai",
+                                       "Trichoderma sp.", "Xylaria polymorpha"),
+                     stringsAsFactors = FALSE)
+  expect_equal(nrow(.herbarium_subset(recs, "Trichoderma")), 2)
+  expect_equal(nrow(.herbarium_subset(recs, "trichoderma harzianum")), 1)
+  expect_null(.herbarium_subset(NULL, "Trichoderma"))
+
+  out <- .rbind_fill(list(data.frame(a = 1, b = "x"), NULL, data.frame(a = 2, c = TRUE)))
+  expect_equal(names(out), c("a", "b", "c"))
+  expect_equal(out$b, c("x", NA))
+  expect_equal(out$c, c(NA, TRUE))
 })

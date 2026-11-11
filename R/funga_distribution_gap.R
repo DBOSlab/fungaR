@@ -1,16 +1,16 @@
-#' Find candidate new Brazilian state records for a fungal taxon
+#' Find candidate new Brazilian state records for fungal taxa
 #'
 #' @description
-#' Given a fungal genus or species, checks \href{https://www.gbif.org}{GBIF} and,
-#' optionally, \href{https://specieslink.net}{speciesLink} and the
-#' \href{https://ipt.jbrj.gov.br/reflora/}{Reflora Virtual Herbarium} for specimen and
-#' occurrence evidence of the taxon in Brazilian states that are \emph{not} currently
-#' listed in its official Flora e Funga do Brasil (FFB) distribution. This flags
-#' candidate new state records for a taxonomist to verify - e.g. a species listed by FFB
-#' only for Bahia, but with specimens indexed from Pernambuco - so that the
-#' distributions in FFB monographs can be kept complete. Georeferenced records are also
-#' placed in the six Brazilian phytogeographic domains, to flag candidate new domain
-#' records in the same way.
+#' Given one or more fungal genera or species, checks \href{https://www.gbif.org}{GBIF},
+#' the \href{https://ipt.jbrj.gov.br/reflora/}{Reflora Virtual Herbarium},
+#' \href{https://jabot.jbrj.gov.br}{JABOT}, and, optionally,
+#' \href{https://specieslink.net}{speciesLink} for specimen and occurrence evidence of
+#' the taxon in Brazilian states that are \emph{not} currently listed in its official
+#' Flora e Funga do Brasil (FFB) distribution. This flags candidate new state records
+#' for a taxonomist to verify - e.g. a species listed by FFB only for Bahia, but with
+#' fungarium specimens from Pernambuco - so that the distributions in FFB monographs can
+#' be kept complete. Georeferenced records are also placed in the six Brazilian
+#' phytogeographic domains, to flag candidate new domain records in the same way.
 #'
 #' @details
 #' \strong{FFB side.} The officially listed states come from the parsed FFB taxon and
@@ -19,24 +19,34 @@
 #' species, those of the species and its infraspecific taxa. If the name is a synonym in
 #' FFB, the distribution of its accepted name is used.
 #'
-#' \strong{Occurrence evidence.} Up to three sources can be queried (see
-#' \code{sources}):
+#' \strong{Occurrence evidence.} Up to four sources can be queried (see
+#' \code{sources}); by default GBIF, Reflora, and JABOT are all queried, and their
+#' evidence is combined, so that a state reported by any one of them is flagged:
 #' \describe{
-#'   \item{\code{"gbif"} (default)}{GBIF's public API. The name is first resolved to
-#'     its GBIF backbone key within the Fungi kingdom only (so a genus name shared with
-#'     a plant, alga, or animal is never confused with the fungal one), so the records
-#'     of its synonyms and infraspecific taxa are included. All states are counted in a
-#'     single request.}
+#'   \item{\code{"gbif"}}{GBIF's public API. The name is first resolved to its GBIF
+#'     backbone key within the Fungi kingdom only (so a genus name shared with a plant,
+#'     alga, or animal is never confused with the fungal one), so the records of its
+#'     synonyms and infraspecific taxa are included. All states are counted in a single
+#'     request.}
 #'   \item{\code{"reflora"}}{Reflora Virtual Herbarium specimens, via
-#'     \code{\link[refloraR]{reflora_records}} (requires the \pkg{refloraR} package).
-#'     Note that the first use downloads the Reflora herbarium archives - several
-#'     gigabytes - which \pkg{refloraR} then caches for later calls.}
+#'     \code{\link[refloraR]{reflora_records}} (requires the \pkg{refloraR} package).}
+#'   \item{\code{"jabot"}}{Specimens of the herbaria/fungaria hosted by JABOT, the Rio
+#'     de Janeiro Botanical Garden's herbarium system, via
+#'     \code{\link[jabotR]{jabot_records}} (requires the \pkg{jabotR} package).}
 #'   \item{\code{"speciesLink"}}{speciesLink's API, which requires a free API key
 #'     (\code{specieslink_key}; create one at \url{https://specieslink.net}).}
 #' }
-#' Free-text state values in these sources (e.g. \code{"Ba"}, \code{"Est. do Bahia"},
-#' \code{"Paraiba"}) are normalised to FFB state names before comparison; values that are
-#' not Brazilian states are ignored.
+#' Reflora and JABOT are read from their herbaria's Darwin Core archives: the first
+#' use downloads them - several gigabytes - to \code{"reflora_download"} and
+#' \code{"jabot_download"} in the working directory, where they are reused by later
+#' calls. Reading them takes a few minutes, so they are read only once per call, for
+#' all the taxa in \code{taxon} together: checking many taxa in one call is much
+#' faster than one call per taxon. Only their specimens collected in Brazil are
+#' counted. Use \code{sources = "gbif"} for a quick check.
+#' The place fields of all sources are standardised with \code{barRoso::std_place()},
+#' so free-text state values (e.g. \code{"Ba"}, \code{"Est. do Bahia"},
+#' \code{"Paraiba"}) match FFB state names before comparison; values that are not
+#' Brazilian states are ignored.
 #'
 #' \strong{Phytogeographic domains.} With \code{domains = TRUE} (default), the GBIF
 #' records that have coordinates - excluding those GBIF flags with geospatial issues,
@@ -44,23 +54,40 @@
 #' the six Brazilian phytogeographic domains (Amazonia, Caatinga, Cerrado, Mata
 #' Atlantica, Pampa, Pantanal) using IBGE's biome map (2019) bundled with fungaR,
 #' simplified to a 1 km tolerance. A domain with records but not listed for the taxon
-#' in FFB is a candidate new domain record. Up to \code{max_coordinates} records are
-#' read (300 per request); Reflora specimens with coordinates are added when
-#' \code{"reflora"} is among \code{sources}. Records that fall outside the six domains
+#' in FFB is a candidate new domain record. Up to \code{max_coordinates} GBIF records
+#' are read (300 per request); the Reflora and JABOT specimens with coordinates are
+#' added when those sources are queried. Records that fall outside the six domains
 #' (e.g. just offshore) are kept in \code{records}, with \code{Domain = NA}, but
 #' are never flagged nor drawn on the report's map. This
 #' analysis requires the \pkg{sf} package, and the map in the HTML report the
 #' \pkg{leaflet} package; without them, they are skipped with a message.
 #'
 #' Occurrence records are evidence to review, not proof: a record in a new state may be
-#' a cultivated specimen, a misidentification, or a georeferencing error, which is why
-#' the HTML report lists the individual records behind each candidate state.
+#' a cultivated or misidentified specimen, or a georeferencing error, which is why the
+#' HTML report lists the individual records behind each candidate state.
+#'
+#' \strong{Several taxa.} Each taxon in \code{taxon} is analysed separately, and its
+#' spreadsheet and HTML report are saved under its own name,
+#' \code{funga_distribution_gap_<taxon>} (e.g.
+#' \code{funga_distribution_gap_Trichoderma_harzianum.xlsx}). A taxon that fails
+#' (e.g. a misspelt name) is reported and skipped, without stopping the others.
+#'
+#' \strong{Taxa with nothing new.} A taxon without any candidate new state or domain
+#' record needs no FFB update, so no spreadsheet or detailed report is written for it.
+#' Instead, all such taxa of a call are listed in a single, simple HTML report,
+#' \code{<dir>/__no_new_records_report.html} (written when \code{html_report = TRUE}),
+#' with what was searched for each - its FFB states and domains, the number of records
+#' per source - and a conclusion: \code{"Within FFB distribution - no update needed"},
+#' or \code{"No records found - check the name"} when the databases returned nothing
+#' at all (which says nothing about the taxon's distribution). Their rows are still
+#' returned.
 #'
 #' @usage
 #' funga_distribution_gap(
 #'   taxon,
 #'   state = NULL,
-#'   sources = "gbif",
+#'   sources = c("gbif", "reflora", "jabot"),
+#'   keep_downloads = TRUE,
 #'   specieslink_key = Sys.getenv("SPECIESLINK_KEY"),
 #'   domains = TRUE,
 #'   max_coordinates = 5000,
@@ -68,21 +95,31 @@
 #'   verbose = TRUE,
 #'   save = TRUE,
 #'   dir = "funga_distribution_gap",
-#'   filename = NULL,
 #'   html_report = TRUE,
-#'   open_report = interactive()
+#'   open_report = FALSE
 #' )
 #'
-#' @param taxon Character. A single fungal genus or species name (e.g.
-#'   \code{"Trichoderma harzianum"} or \code{"Trichoderma"}).
+#' @param taxon Character vector. One or more fungal genus or species names (e.g.
+#'   \code{"Trichoderma harzianum"}, \code{"Trichoderma"}, or
+#'   \code{c("Trichoderma harzianum", "Trichoderma viride")}). Each is analysed
+#'   separately; see Details.
 #'
 #' @param state Character vector. Optional subset of Brazilian states (full name or
 #'   acronym) to restrict the check to. \code{NULL} (default) checks all states with any
 #'   evidence.
 #'
 #' @param sources Character vector. Which occurrence sources to query: any of
-#'   \code{"gbif"}, \code{"reflora"}, \code{"speciesLink"}. Defaults to \code{"gbif"},
-#'   the fastest. See Details for the requirements of the other two.
+#'   \code{"gbif"}, \code{"reflora"}, \code{"jabot"}, \code{"speciesLink"}. Defaults
+#'   to \code{c("gbif", "reflora", "jabot")}, combining the evidence of all three
+#'   collection databases; \code{"gbif"} alone is the fastest. See Details for the
+#'   requirements of each.
+#'
+#' @param keep_downloads Logical. Applies to Reflora and JABOT. If \code{TRUE}
+#'   (default), the herbarium archives downloaded to \code{"reflora_download"} and
+#'   \code{"jabot_download"} in the working directory are kept, so that later runs -
+#'   for this or other taxa - reuse them instead of downloading them again. If
+#'   \code{FALSE}, those folders are deleted once the analysis is finished, leaving the
+#'   working directory clean (they take several gigabytes).
 #'
 #' @param specieslink_key Character. speciesLink API key, used when
 #'   \code{"speciesLink"} is among \code{sources}. Defaults to the
@@ -100,17 +137,19 @@
 #'
 #' @param verbose Logical. If \code{TRUE} (default), prints progress messages.
 #'
-#' @param save Logical. If \code{TRUE} (default), the result is saved to disk as an
-#'   \code{.xlsx} spreadsheet.
+#' @param save Logical. If \code{TRUE} (default), the result of each taxon with at
+#'   least one candidate new state or domain record is saved to disk as an \code{.xlsx}
+#'   spreadsheet named after the taxon, \code{funga_distribution_gap_<taxon>.xlsx}.
+#'   Taxa with nothing new get no spreadsheet (see Details).
 #'
-#' @param dir Character. Directory where the spreadsheet is saved when \code{save = TRUE}.
+#' @param dir Character. Directory where the spreadsheets and reports are saved.
 #'   Defaults to \code{"funga_distribution_gap"}.
 #'
-#' @param filename Character. Name of the \code{.xlsx} file (without extension) to save.
-#'   Defaults to \code{"funga_distribution_gap_<taxon>"}.
-#'
 #' @param html_report Logical. If \code{TRUE} (default), also writes a self-contained
-#'   HTML report (\code{<dir>/<filename>.html}) summarizing the results: KPI counts, an
+#'   HTML report for each taxon with candidates
+#'   (\code{<dir>/funga_distribution_gap_<taxon>.html}), plus a single
+#'   \code{<dir>/__no_new_records_report.html} listing the taxa with nothing new (see
+#'   Details) summarizing the results: KPI counts, an
 #'   evidence-by-source breakdown, the full state-by-state table, the domain table, an
 #'   interactive map of the georeferenced records over the phytogeographic domains
 #'   (coloured by candidate status), the records in candidate domains, and the individual
@@ -120,15 +159,18 @@
 #'   \pkg{DT}, and \pkg{htmltools} packages; if any is missing, the report is skipped with
 #'   a message (the \code{.xlsx} spreadsheet is unaffected).
 #'
-#' @param open_report Logical. If \code{TRUE} (default in interactive sessions), opens
-#'   the HTML report in the browser once rendered.
+#' @param open_report Logical. If \code{TRUE}, opens the HTML report in the
+#'   browser once rendered (in interactive sessions only). Default \code{FALSE}:
+#'   the report is only saved to \code{dir}.
 #'
-#' @return A list of three \code{data.frame}s:
+#' @return A list of three \code{data.frame}s, each with a \code{Taxon} column; with
+#'   several taxa, the rows of all of them are stacked:
 #' \describe{
 #'   \item{\code{states}}{One row per Brazilian state with any evidence for
 #'     \code{taxon} (in FFB or in the queried sources): \code{Taxon}, \code{State},
 #'     \code{In_FFB_distribution} (whether FFB already lists the state),
-#'     \code{GBIF_records}, \code{Reflora_records}, and \code{speciesLink_records}
+#'     \code{GBIF_records}, \code{Reflora_records}, \code{Jabot_records}, and
+#'     \code{speciesLink_records}
 #'     (records in the state, for each source queried), and
 #'     \code{New_state_record_candidate} (\code{TRUE} when the state has evidence from
 #'     at least one source but is not in FFB's distribution).}
@@ -163,9 +205,16 @@
 #' gap$domains
 #' gap$records[gap$records$New_domain_record_candidate, ]
 #'
-#' # Adding Reflora herbarium specimens (requires refloraR)
-#' gap_reflora <- funga_distribution_gap(taxon = "Trichoderma harzianum",
-#'                                       sources = c("gbif", "reflora"))
+#' # Several species in one call: Reflora and JABOT are read once, and each species
+#' # gets its own spreadsheet and report
+#' gap_many <- funga_distribution_gap(taxon = c("Trichoderma harzianum",
+#'                                              "Trichoderma viride",
+#'                                              "Trichoderma koningii"))
+#' gap_many$states[gap_many$states$New_state_record_candidate, ]
+#'
+#' # A quick check with GBIF only
+#' gap_gbif <- funga_distribution_gap(taxon = "Trichoderma harzianum",
+#'                                    sources = "gbif")
 #' }
 #'
 #' @importFrom openxlsx write.xlsx
@@ -174,7 +223,8 @@
 
 funga_distribution_gap <- function(taxon,
                                    state = NULL,
-                                   sources = "gbif",
+                                   sources = c("gbif", "reflora", "jabot"),
+                                   keep_downloads = TRUE,
                                    specieslink_key = Sys.getenv("SPECIESLINK_KEY"),
                                    domains = TRUE,
                                    max_coordinates = 5000,
@@ -182,27 +232,53 @@ funga_distribution_gap <- function(taxon,
                                    verbose = TRUE,
                                    save = TRUE,
                                    dir = "funga_distribution_gap",
-                                   filename = NULL,
                                    html_report = TRUE,
-                                   open_report = interactive()) {
+                                   open_report = FALSE) {
 
-  if (missing(taxon) || is.null(taxon) || !is.character(taxon) || length(taxon) != 1) {
-    stop("'taxon' must be a single character string (one genus or species name).",
-         call. = FALSE)
+  taxon <- .check_taxa(taxon, "genus or species name")
+  sources <- match.arg(sources, c("gbif", "reflora", "jabot", "speciesLink"),
+                       several.ok = TRUE)
+  if (!isTRUE(keep_downloads)) {
+    on.exit(.rm_herbarium_downloads(sources, verbose), add = TRUE)
   }
-  sources <- match.arg(sources, c("gbif", "reflora", "speciesLink"), several.ok = TRUE)
-  taxon <- trimws(gsub("\\s+", " ", taxon))
 
-  if (is.null(filename)) {
-    filename <- paste0("funga_distribution_gap_", gsub("\\s+", "_", taxon))
+  # FFB and the herbarium archives are read once, for all taxa
+  ffb <- .funga_prepare_records(version = version, verbose = FALSE, rm_funga_database = FALSE)
+  herb_all <- .herbarium_records_all(sources, taxon, verbose)
+
+  outs <- .run_per_taxon(taxon, verbose, function(tx) {
+    .distribution_gap_taxon(tx, state = state, sources = sources, ffb = ffb,
+                            herb_all = herb_all, specieslink_key = specieslink_key,
+                            domains = domains, max_coordinates = max_coordinates,
+                            verbose = verbose, save = save, dir = dir,
+                            html_report = html_report, open_report = open_report)
+  })
+  .no_gap_report(outs, what = "distribution", sources = sources, dir = dir,
+                 html_report = html_report, verbose = verbose, open_report = open_report)
+  if (length(outs) == 0) {
+    return(list(states = .rbind_fill(list()), domains = .empty_domain_table(),
+                records = .empty_coord_records()))
   }
+  list(states = .rbind_fill(lapply(outs, `[[`, "states")),
+       domains = .rbind_fill(lapply(outs, `[[`, "domains")),
+       records = .rbind_fill(lapply(outs, `[[`, "records")))
+}
+
+
+#_______________________________________________________________________________
+# funga_distribution_gap() for one taxon, given the FFB tables ('ffb') and the
+# standardised Reflora/JABOT records of all queried taxa ('herb_all') ####
+.distribution_gap_taxon <- function(taxon, state, sources, ffb, herb_all, specieslink_key,
+                                    domains, max_coordinates, verbose, save, dir,
+                                    html_report, open_report) {
+
+  filename <- paste0("funga_distribution_gap_", gsub("\\s+", "_", taxon))
 
   # ------------------------------------------------------------------------
   # 1. FFB's officially listed states for this taxon
   # ------------------------------------------------------------------------
   if (verbose) message("Retrieving FFB's officially listed states for '", taxon, "'...")
 
-  ffb <- .funga_prepare_records(version = version, verbose = FALSE, rm_funga_database = FALSE)
   ffb_taxon <- .ffb_taxon_states(taxon, ffb$taxon_df, ffb$distribution_df)
   ffb_states <- ffb_taxon$states
   ffb_domains <- ffb_taxon$domains
@@ -251,38 +327,33 @@ funga_distribution_gap <- function(taxon,
     }
   }
 
-  reflora_df <- data.frame(State = character(0), Reflora_records = integer(0),
-                           stringsAsFactors = FALSE)
-  reflora_result <- NULL
-  if ("reflora" %in% sources) {
-    if (!requireNamespace("refloraR", quietly = TRUE)) {
-      if (verbose) {
-        message("  Package 'refloraR' is not installed; skipping Reflora. Install it ",
-                "with remotes::install_github('DBOSlab/refloraR') to include this source.")
-      }
-    } else {
-      if (verbose) {
-        message("Querying Reflora herbarium specimens (via refloraR; the first use ",
-                "downloads the Reflora archives)...")
-      }
-      reflora_result <- tryCatch({
-        refloraR::reflora_records(taxon = taxon, verbose = FALSE, save = FALSE)
-      }, error = function(e) {
-        if (verbose) message("  Reflora query failed: ", conditionMessage(e))
-        NULL
-      })
-      if (!is.null(reflora_result) && nrow(reflora_result) > 0 &&
-          "stateProvince" %in% names(reflora_result)) {
-        st <- .normalize_br_state(reflora_result$stateProvince)
-        st <- st[!is.na(st)]
-        if (length(st) > 0) {
-          tab <- table(st)
-          reflora_df <- data.frame(State = names(tab), Reflora_records = as.integer(tab),
-                                   stringsAsFactors = FALSE)
-        }
-      }
+  # Herbarium specimens (Reflora, JABOT): records collected in Brazil, and
+  # their counts per state
+  herbaria <- intersect(c("reflora", "jabot"), sources)
+  herb_records <- list()
+  herb_counts <- list()
+  for (src in herbaria) {
+    column <- .herbarium_sources[[src]]$column
+    herb_counts[[src]] <- stats::setNames(data.frame(character(0), integer(0),
+                                                     stringsAsFactors = FALSE),
+                                          c("State", column))
+    recs <- .herbarium_subset(herb_all[[src]], taxon)
+    if (is.null(recs)) next
+    recs <- recs[.in_brazil(recs$Country, recs$State), , drop = FALSE]
+    herb_records[[src]] <- recs
+    st <- recs$State[!is.na(recs$State)]
+    if (length(st) > 0) {
+      tab <- table(st)
+      herb_counts[[src]] <- stats::setNames(data.frame(names(tab), as.integer(tab),
+                                                       stringsAsFactors = FALSE),
+                                            c("State", column))
+    }
+    if (verbose) {
+      message("  ", .herbarium_sources[[src]]$label, ": ", nrow(recs),
+              " Brazilian specimen(s) in ", nrow(herb_counts[[src]]), " state(s).")
     }
   }
+  herb_states <- unlist(lapply(herb_counts, `[[`, "State"), use.names = FALSE)
 
   splink_df <- data.frame(State = character(0), speciesLink_records = integer(0),
                           stringsAsFactors = FALSE)
@@ -307,7 +378,7 @@ funga_distribution_gap <- function(taxon,
   # ------------------------------------------------------------------------
   # 3. One row per state with ANY evidence (FFB or external)
   # ------------------------------------------------------------------------
-  all_states <- unique(c(ffb_states, gbif_df$State, reflora_df$State, splink_df$State))
+  all_states <- unique(c(ffb_states, gbif_df$State, herb_states, splink_df$State))
 
   if (!is.null(state)) {
     requested <- .normalize_br_state(state)
@@ -323,7 +394,10 @@ funga_distribution_gap <- function(taxon,
                       New_state_record_candidate = logical(0), stringsAsFactors = FALSE)
   if (length(all_states) == 0) {
     if (verbose) message("\nNo evidence found for '", taxon, "' in the requested states or sources.")
-    return(list(states = empty, domains = .empty_domain_table(), records = .empty_coord_records()))
+    out <- list(states = empty, domains = .empty_domain_table(), records = .empty_coord_records())
+    attr(out, "no_gap") <- .distribution_no_gap_row(taxon, ffb_taxon, sources, gbif_df,
+                                                    herb_counts, splink_df, 0L)
+    return(out)
   }
 
   result <- data.frame(Taxon = taxon, State = sort(all_states), stringsAsFactors = FALSE)
@@ -334,12 +408,15 @@ funga_distribution_gap <- function(taxon,
     v
   }
   if ("gbif" %in% sources) result$GBIF_records <- fill(gbif_df, "GBIF_records")
-  if ("reflora" %in% sources) result$Reflora_records <- fill(reflora_df, "Reflora_records")
+  for (src in herbaria) {
+    column <- .herbarium_sources[[src]]$column
+    result[[column]] <- fill(herb_counts[[src]], column)
+  }
   if ("speciesLink" %in% sources) {
     result$speciesLink_records <- fill(splink_df, "speciesLink_records")
   }
 
-  external <- unique(c(gbif_df$State, reflora_df$State, splink_df$State))
+  external <- unique(c(gbif_df$State, herb_states, splink_df$State))
   result$New_state_record_candidate <- !result$In_FFB_distribution & result$State %in% external
   rownames(result) <- NULL
 
@@ -358,35 +435,33 @@ funga_distribution_gap <- function(taxon,
                 "analysis. Install it with install.packages('sf') to include it.")
       }
     } else {
-      coords <- .empty_coord_records()[, character(0)]
+      coord_cols <- c("Source", "Latitude", "Longitude", "State", "Municipality",
+                      "Locality", "RecordedBy", "RecordNumber", "EventDate", "Institution",
+                      "CatalogNumber", "Identified_as", "RecordLink")
+      coords <- .empty_coord_records()[, coord_cols]
       if (!is.null(gbif_key)) {
         if (verbose) message("Placing georeferenced GBIF records in phytogeographic domains...")
         g <- .gbif_brazil_coordinates(gbif_key$key, max_records = max_coordinates)
-        if (nrow(g) > 0) coords <- cbind(data.frame(Source = "GBIF", stringsAsFactors = FALSE), g)
+        if (nrow(g) > 0) {
+          g$Source <- "GBIF"
+          # Queried for Brazil only: the country is set for barRoso::std_place()
+          place <- suppressMessages(barRoso::std_place(data.frame(
+            country = "Brazil", stateProvince = g$StateProvince,
+            municipality = g$Municipality, locality = g$Locality, stringsAsFactors = FALSE)))
+          g$State <- .normalize_br_state(place$stateProvince)
+          g$Municipality <- place$municipality
+          g$Locality <- place$locality
+          coords <- rbind(coords, g[, coord_cols])
+        }
       }
-      if (!is.null(reflora_result) && nrow(reflora_result) > 0 &&
-          all(c("decimalLatitude", "decimalLongitude") %in% names(reflora_result))) {
-        rc <- reflora_result
-        col <- function(nm) if (nm %in% names(rc)) as.character(rc[[nm]]) else NA_character_
-        reflora_coords <- data.frame(
-          Source = "Reflora",
-          Latitude = suppressWarnings(as.numeric(rc$decimalLatitude)),
-          Longitude = suppressWarnings(as.numeric(rc$decimalLongitude)),
-          StateProvince = col("stateProvince"), Municipality = col("municipality"),
-          Locality = col("locality"), RecordedBy = col("recordedBy"),
-          RecordNumber = col("recordNumber"), EventDate = col("year"),
-          Institution = col("herbarium"), CatalogNumber = col("catalogNumber"),
-          Identified_as = col("scientificName"), RecordLink = col("bibliographicCitation"),
-          stringsAsFactors = FALSE)
-        reflora_coords <- reflora_coords[!is.na(reflora_coords$Latitude) &
-                                           !is.na(reflora_coords$Longitude), ]
-        coords <- if (ncol(coords) == 0) reflora_coords else rbind(coords, reflora_coords)
+      for (src in names(herb_records)) {
+        h <- herb_records[[src]]
+        h <- h[!is.na(h$Latitude) & !is.na(h$Longitude), coord_cols, drop = FALSE]
+        coords <- rbind(coords, h)
       }
 
-      if (ncol(coords) > 0 && nrow(coords) > 0) {
-        coords$State <- .normalize_br_state(coords$StateProvince)
+      if (nrow(coords) > 0) {
         coords$Domain <- .assign_br_domain(coords$Longitude, coords$Latitude)
-        coords$StateProvince <- NULL
         if (!is.null(state)) coords <- coords[coords$State %in% all_states, ]
         coords$New_state_record_candidate <- !is.na(coords$State) & !coords$State %in% ffb_states
         coords$New_domain_record_candidate <- !is.na(coords$Domain) & !coords$Domain %in% ffb_domains
@@ -426,20 +501,37 @@ funga_distribution_gap <- function(taxon,
 
   out <- list(states = result, domains = domain_table, records = coord_records)
 
+  # Nothing new for FFB: no spreadsheet or report for this taxon, only a row in
+  # the run's single no-gap report
+  if (n_new == 0 && n_new_domains == 0) {
+    if (verbose) message("  No new state or domain record: no files written for '", taxon, "'.")
+    attr(out, "no_gap") <- .distribution_no_gap_row(taxon, ffb_taxon, sources, gbif_df,
+                                                    herb_counts, splink_df,
+                                                    nrow(coord_records))
+    return(out)
+  }
+
   if (save) {
     dir <- .arg_check_dir(dir)
     .save_xlsx(out, verbose = verbose, filename = filename, dir = dir)
   }
 
   if (html_report) {
+    herb_count <- function(src, what) {
+      h <- herb_counts[[src]]
+      if (is.null(h)) return(0L)
+      if (what == "states") nrow(h) else sum(h[[.herbarium_sources[[src]]$column]])
+    }
     source_summary <- data.frame(
-      Source = c("FFB (official)", "GBIF", "Reflora", "speciesLink"),
-      States = c(length(ffb_states), nrow(gbif_df), nrow(reflora_df), nrow(splink_df)),
-      Records = c(NA_integer_, sum(gbif_df$GBIF_records), sum(reflora_df$Reflora_records),
-                  sum(splink_df$speciesLink_records)),
+      Source = c("FFB (official)", "GBIF", "Reflora", "JABOT", "speciesLink"),
+      States = c(length(ffb_states), nrow(gbif_df), herb_count("reflora", "states"),
+                 herb_count("jabot", "states"), nrow(splink_df)),
+      Records = c(NA_integer_, sum(gbif_df$GBIF_records), herb_count("reflora", "records"),
+                  herb_count("jabot", "records"), sum(splink_df$speciesLink_records)),
       stringsAsFactors = FALSE
     )
-    source_summary <- source_summary[c(TRUE, c("gbif", "reflora", "speciesLink") %in% sources), ]
+    source_summary <- source_summary[c(TRUE, c("gbif", "reflora", "jabot", "speciesLink") %in%
+                                         sources), ]
 
     # ---- Individual records behind each new-state-record candidate, each
     # linking to the record itself in its source database
@@ -456,6 +548,11 @@ funga_distribution_gap <- function(taxon,
       for (st in candidates) {
         recs <- .gbif_brazil_state_records(gbif_key$key, gbif_raw[[st]])
         if (nrow(recs) > 0) {
+          place <- suppressMessages(barRoso::std_place(data.frame(
+            country = "Brazil", stateProvince = st, municipality = recs$Municipality,
+            locality = recs$Locality, stringsAsFactors = FALSE)))
+          recs$Municipality <- place$municipality
+          recs$Locality <- place$locality
           records_detail <- rbind(records_detail,
                                   cbind(data.frame(Source = "GBIF", State = st,
                                                    stringsAsFactors = FALSE), recs))
@@ -463,23 +560,10 @@ funga_distribution_gap <- function(taxon,
       }
     }
 
-    if (!is.null(reflora_result) && nrow(reflora_result) > 0 && length(candidates) > 0 &&
-        "stateProvince" %in% names(reflora_result)) {
-      st <- .normalize_br_state(reflora_result$stateProvince)
-      rc <- reflora_result[st %in% candidates, , drop = FALSE]
-      if (nrow(rc) > 0) {
-        col <- function(nm) if (nm %in% names(rc)) as.character(rc[[nm]]) else NA_character_
-        records_detail <- rbind(records_detail, data.frame(
-          Source = "Reflora",
-          State = .normalize_br_state(rc$stateProvince),
-          Municipality = col("municipality"), Locality = col("locality"),
-          RecordedBy = col("recordedBy"), RecordNumber = col("recordNumber"),
-          EventDate = col("year"), Institution = col("herbarium"),
-          CatalogNumber = col("catalogNumber"), Identified_as = col("scientificName"),
-          RecordLink = col("bibliographicCitation"),
-          stringsAsFactors = FALSE
-        ))
-      }
+    for (src in names(herb_records)) {
+      h <- herb_records[[src]]
+      h <- h[!is.na(h$State) & h$State %in% candidates, names(records_detail), drop = FALSE]
+      records_detail <- rbind(records_detail, h)
     }
 
     report_data <- list(
@@ -516,6 +600,37 @@ funga_distribution_gap <- function(taxon,
 
 
 # Empty result tables, with the columns funga_distribution_gap() returns
+# One row of the no-gap report: what was searched for a taxon without any
+# candidate new state or domain record ####
+.distribution_no_gap_row <- function(taxon, ffb_taxon, sources, gbif_df, herb_counts,
+                                     splink_df, n_georef) {
+  n_herb <- function(src) {
+    h <- herb_counts[[src]]
+    if (is.null(h)) NA_integer_ else as.integer(sum(h[[.herbarium_sources[[src]]$column]]))
+  }
+  row <- data.frame(Taxon = taxon,
+                    FFB_name = if (ffb_taxon$found) ffb_taxon$name else NA_character_,
+                    FFB_states = length(ffb_taxon$states),
+                    FFB_domains = paste(ffb_taxon$domains, collapse = ", "),
+                    stringsAsFactors = FALSE)
+  if ("gbif" %in% sources) row$GBIF_records <- as.integer(sum(gbif_df$GBIF_records))
+  if ("reflora" %in% sources) row$Reflora_records <- n_herb("reflora")
+  if ("jabot" %in% sources) row$Jabot_records <- n_herb("jabot")
+  if ("speciesLink" %in% sources) {
+    row$speciesLink_records <- as.integer(sum(splink_df$speciesLink_records))
+  }
+  row$Georeferenced_records <- as.integer(n_georef)
+  n_rec <- sum(unlist(row[intersect(c("GBIF_records", "Reflora_records", "Jabot_records",
+                                      "speciesLink_records"), names(row))]), na.rm = TRUE)
+  row$Conclusion <- if (n_rec == 0) {
+    "No records found - check the name"
+  } else {
+    "Within FFB distribution - no update needed"
+  }
+  row
+}
+
+
 .empty_domain_table <- function() {
   data.frame(Taxon = character(0), Domain = character(0), In_FFB_distribution = logical(0),
              Georeferenced_records = integer(0), New_domain_record_candidate = logical(0),
